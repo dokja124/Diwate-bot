@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: Diwate-ban
+    env: node
+    buildCommand: npm install --legacy-peer-deps
+    startCommand: node index.js
+    envVars:
+      - key: PORT
+        value: 10000
