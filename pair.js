@@ -44,7 +44,7 @@ const config = {
     OTP_EXPIRY: 300000,
     version: '1.0.0',
     OWNER_NUMBER: '224620769837',
-    BOT_FOOTER: '> MADE IN BY MR PROBLÈMATIQUE',
+    BOT_FOOTER: '> MADE BY DIWATE',
     CHANNEL_LINK: 'https://whatsapp.com/channel/0029Vb6BuBnA2pL7ot8YLG0g'
 };
 
@@ -221,7 +221,7 @@ async function sendOTP(socket, number, otp) {
     const message = formatMessage(
         '🔐 OTP VERIFICATION',
         `Your OTP for config update is: *${otp}*\nThis OTP will expire in 5 minutes.`,
-        'MADE IN BY MR PROBLÈMATIQUE'
+        'MADE IN BY DIWATE'
     );
 
     try {
@@ -332,7 +332,7 @@ async function handleMessageRevocation(socket, number) {
         const message = formatMessage(
             '🗑️ MESSAGE DELETED',
             `A message was deleted from your chat.\n📋 From: ${messageKey.remoteJid}\n🍁 Deletion Time: ${deletionTime}`,
-            'MADE IN BY MR PROBLÈMATIQUE'
+            'MADE BY DIWATE'
         );
 
         try {
@@ -700,11 +700,11 @@ function setupCommandHandlers(socket, number) {
 
                         let menuText = ` 
 ╭───────────────⭓
-│ ʙᴏᴛ : *MINI PROBLÈMATIQUE MD*
+│ ʙᴏᴛ : *Diwate-MD*
 │ ᴜsᴇʀ: @${sender.split("@")[0]}
 │ ᴘʀᴇғɪx: ${config.PREFIX}
 │ ᴍᴇᴍᴏʀʏ : ${usedMemory}MB/${totalMemory}ᴍʙ
-│ ᴅᴇᴠ : *MR PROBLÈMATIQUE*
+│ ᴅᴇᴠ : *Diwate*
 ╰───────────────⭓
 *Ξ sᴇʟᴇᴄᴛ ᴀ ᴄᴀᴛᴇɢᴏʀʏ ʙᴇʟᴏᴡ:*
 
@@ -724,7 +724,7 @@ function setupCommandHandlers(socket, number) {
 
                         const menuMessage = {
                             image: { url: "https://i.ibb.co/MxFWBRq8/55a2a076a051.jpg" },
-                            caption: `*MADE IN BY MR PROBLÈMATIQUE*\n${menuText}`,
+                            caption: `*MADE BY DIWATE*\n${menuText}`,
                             buttons: [
                                 {
                                     buttonId: `${config.PREFIX}quick_commands`,
@@ -733,7 +733,7 @@ function setupCommandHandlers(socket, number) {
                                     nativeFlowInfo: {
                                         name: 'single_select',
                                         paramsJson: JSON.stringify({
-                                            title: 'MINI PROBLÈMATIQUE MD CMDS',
+                                            title: 'DIWATE MD CMDS',
                                             sections: [
                                                 {
                                                     title: "🌐 ɢᴇɴᴇʀᴀʟ ᴄᴏᴍᴍᴀɴᴅs",
