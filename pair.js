@@ -1,127 +1,94 @@
-const { makeid } = require('./id.js');
 const express = require('express');
-const fs = require('fs');
+const router = express.Router();
 const path = require('path');
-const pino = require("pino");
+const fs = require('fs-extra');
+const pino = require('pino');
 const {
-    default: makeWASocket,
-    useMultiFileAuthState,
-    delay,
-    Browsers,
-    makeCacheableSignalKeyStore
+  default: makeWASocket,
+  useMultiFileAuthState,
+  delay,
+  Browsers,
 } = require('@whiskeysockets/baileys');
 
-const router = express.Router();
+const handleMessages = require('./handler');
 
-function removeFolder(folderPath) {
-    if (fs.existsSync(folderPath)) {
-        fs.rmSync(folderPath, { recursive: true, force: true });
+// Garde une référence des sessions actives en mémoire (number -> sock)
+const sessions = {};
+
+async function startSession(number) {
+  const sessionPath = path.join(__dirname, 'session', number);
+  await fs.ensureDir(sessionPath);
+  const { state, saveCreds } = await useMultiFileAuthState(sessionPath);
+
+  const sock = makeWASocket({
+    auth: state,
+    printQRInTerminal: false,
+    logger: pino({ level: 'silent' }),
+    browser: Browsers.ubuntu('Chrome'),
+  });
+
+  sock.ev.on('creds.update', saveCreds);
+
+  sock.ev.on('connection.update', (update) => {
+    const { connection, lastDisconnect } = update;
+
+    if (connection === 'open') {
+      console.log(`✅ Connecté : ${number}`);
     }
+
+    if (connection === 'close') {
+      const statusCode = lastDisconnect?.error?.output?.statusCode;
+      const loggedOut = statusCode === 401; // DisconnectReason.loggedOut
+
+      console.log(`❌ Déconnecté : ${number} (code: ${statusCode || 'inconnu'})`);
+
+      if (loggedOut) {
+        console.log(`🚫 Session invalide pour ${number}, il faut re-pairer via /code?number=${number}`);
+        delete sessions[number];
+      } else {
+        console.log(`🔁 Reconnexion automatique pour ${number}...`);
+        delete sessions[number];
+        startSession(number).catch((e) =>
+          console.error(`Erreur lors de la reconnexion de ${number}:`, e)
+        );
+      }
+    }
+  });
+
+  // C'est ici que chaque message reçu passe par le gestionnaire de commandes
+  sock.ev.on('messages.upsert', async (m) => {
+    try {
+      await handleMessages(sock, m);
+    } catch (e) {
+      console.error('Erreur handler:', e);
+    }
+  });
+
+  sessions[number] = sock;
+  return sock;
 }
 
 router.get('/', async (req, res) => {
-    const id = makeid();
-    const tempDir = path.join(__dirname, 'temp', id);
-    const phoneNumber = (req.query.number || '').replace(/\D/g, '');
+  const number = (req.query.number || '').replace(/[^0-9]/g, '');
+  if (!number) {
+    return res.status(400).json({ error: 'Numéro manquant' });
+  }
 
-    if (!phoneNumber) {
-        return res.status(400).send({ error: "Please provide a valid phone number" });
+  try {
+    const sock = await startSession(number);
+
+    if (!sock.authState.creds.registered) {
+      await delay(1500);
+      const code = await sock.requestPairingCode(number);
+      return res.json({ code });
+    } else {
+      return res.json({ code: 'DEJA_CONNECTE' });
     }
-
-    async function createSocketSession() {
-        const { state, saveCreds } = await useMultiFileAuthState(tempDir);
-        const logger = pino({ level: "fatal" }).child({ level: "fatal" });
-
-        const sock = makeWASocket({
-            auth: {
-                creds: state.creds,
-                keys: makeCacheableSignalKeyStore(state.keys, logger)
-            },
-            printQRInTerminal: false,
-            generateHighQualityLinkPreview: true,
-            logger,
-            syncFullHistory: false,
-            browser: Browsers.macOS("Safari")
-        });
-
-        sock.ev.on('creds.update', saveCreds);
-
-        sock.ev.on("connection.update", async (update) => {
-            const { connection, lastDisconnect } = update;
-
-            if (connection === "open") {
-                await delay(5000);
-
-                try {
-                    const credsPath = path.join(tempDir, 'creds.json');
-                    const sessionData = fs.readFileSync(credsPath, 'utf8');
-                    const base64 = Buffer.from(sessionData).toString('base64');
-                    const sessionId = "ARSLAN-MD~" + base64;
-
-                    await sock.sendMessage(sock.user.id, { text: sessionId });
-
-                    const successMsg = {
-                        text:
-                            `🚀 *ARSLAN-MD Session Created!*\n\n` +
-                            `▸ *Never share* your session ID\n` +
-                            `▸ Join our WhatsApp Channel\n` +
-                            `▸ Report bugs on GitHub\n\n` +
-                            `_Powered by ARSLAN-MD\n\n` +
-                            `🔗 *Useful Links:*\n` +
-                            `▸ GitHub: https://github.com/Arslan-MD/Arslan_MD\n` +
-                            `▸ https://whatsapp.com/channel/0029VarfjW04tRrmwfb8x306`,
-                        contextInfo: {
-                            mentionedJid: [sock.user.id],
-                            forwardingScore: 1000,
-                            isForwarded: true,
-                            forwardedNewsletterMessageInfo: {
-                                newsletterJid: "120363348739987203@newsletter",
-                                newsletterName: "ARSLAN-MD",
-                                serverMessageId: 143
-                            }
-                        }
-                    };
-
-                    await sock.sendMessage(sock.user.id, successMsg);
-
-                } catch (err) {
-                    console.error("❌ Session Error:", err.message);
-                    await sock.sendMessage(sock.user.id, {
-                        text: `⚠️ Error: ${err.message.includes('rate limit') ? 'Server is busy. Try later.' : err.message}`
-                    });
-                } finally {
-                    await delay(1000);
-                    await sock.ws.close();
-                    removeFolder(tempDir);
-                    console.log(`✅ ${sock.user.id} session completed`);
-                    process.exit();
-                }
-
-            } else if (connection === "close" && lastDisconnect?.error?.output?.statusCode !== 401) {
-                console.log("🔁 Reconnecting...");
-                await delay(10);
-                createSocketSession();
-            }
-        });
-
-        if (!sock.authState.creds.registered) {
-            await delay(1500);
-            const pairingCode = await sock.requestPairingCode(phoneNumber, "EDITH123");
-            if (!res.headersSent) {
-                return res.send({ code: pairingCode });
-            }
-        }
-    }
-
-    try {
-        await createSocketSession();
-    } catch (err) {
-        console.error("🚨 Fatal Error:", err.message);
-        removeFolder(tempDir);
-        if (!res.headersSent) {
-            res.status(500).send({ code: "Service Unavailable. Try again later." });
-        }
-    }
+  } catch (err) {
+    console.error('Erreur pairing:', err);
+    return res.status(500).json({ error: 'Service Unavailable' });
+  }
 });
 
 module.exports = router;
+        
