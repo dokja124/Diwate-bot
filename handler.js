@@ -6,7 +6,7 @@ module.exports = async function handleMessages(sock, { messages, type }) {
   if (type !== 'notify') return;
 
   const msg = messages[0];
-  if (!msg.message || msg.key.fromMe) return;
+  if (!msg.message) return;
 
   const chatId = msg.key.remoteJid;
   const text =
