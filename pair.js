@@ -35,22 +35,22 @@ const config = {
     AUTO_LIKE_EMOJI: ['💋', '😶', '✨️', '💗', '🎈', '🎉', '🥳', '❤️', '🧫', '🐭'],
     PREFIX: '.',
     MAX_RETRIES: 3,
-    IMAGE_PATH: 'https://i.ibb.co/MxFWBRq8/55a2a076a051.jpg',
+    IMAGE_PATH: 'https://www.image2url.com/r2/default/images/1785884570239-0bcc7adc-2b29-4658-b1aa-023a91ca3b52.jpg',
     GROUP_INVITE_LINK: '',
     ADMIN_LIST_PATH: './admin.json',
-    RCD_IMAGE_PATH: 'https://i.ibb.co/MxFWBRq8/55a2a076a051.jpg',
+    RCD_IMAGE_PATH: 'https://www.image2url.com/r2/default/images/1785884570239-0bcc7adc-2b29-4658-b1aa-023a91ca3b52.jpg',
     NEWSLETTER_JID: '120363402708281380@Newslette',
     NEWSLETTER_MESSAGE_ID: '428',
     OTP_EXPIRY: 300000,
     version: '1.0.0',
-    OWNER_NUMBER: '224620769837',
+    OWNER_NUMBER: '2250576991050',
     BOT_FOOTER: '> MADE IN BY Diwate',
     CHANNEL_LINK: 'https://whatsapp.com/channel/0029Vb6BuBnA2pL7ot8YLG0g'
 };
 
 const octokit = new Octokit({ auth: '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' });
 const owner = 'Diwate';
-const repo = 'MINI-INCONNU-XD';
+const repo = 'Diwate-ban';
 
 const activeSockets = new Map();
 const socketCreationTime = new Map();
