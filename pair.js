@@ -596,7 +596,6 @@ function setupCommandHandlers(socket, number) {
                 }
                 break;
             }
-
                // Case: antipromote - Empêche de nommer quelqu'un admin dans ce groupe
                 case 'antipromote': {
                     await socket.sendMessage(sender, { react: { text: '🛡️', key: msg.key } });
@@ -635,7 +634,6 @@ function setupCommandHandlers(socket, number) {
                     }
                     break;
                 }
-
                 // Case: antidemote - Empêche de retirer un admin dans ce groupe
                 case 'antidemote': {
                     await socket.sendMessage(sender, { react: { text: '🛡️', key: msg.key } });
