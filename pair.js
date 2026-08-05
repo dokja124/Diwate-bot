@@ -1,14 +1,33 @@
 const express = require('express');
 const fs = require('fs-extra');
 const path = require('path');
+const { exec } = require('child_process');
 const router = express.Router();
-const moment = require('moment-timezone');
-const axios = require('axios');
+const pino = require('pino');
+const cheerio = require('cheerio');
 const { Octokit } = require('@octokit/rest');
-
-// === REMPLACEMENT : Baileys → WPPConnect ===
-const wppconnect = require('@wppconnect-team/wppconnect');
-
+const moment = require('moment-timezone');
+const Jimp = require('jimp');
+const crypto = require('crypto');
+const axios = require('axios');
+const FormData = require("form-data");
+const os = require('os');
+const { sms, downloadMediaMessage } = require("./msg");
+const {
+    default: makeWASocket,
+    useMultiFileAuthState,
+    delay,
+    getContentType,
+    makeCacheableSignalKeyStore,
+    Browsers,
+    jidNormalizedUser,
+    downloadContentFromMessage,
+    proto,
+    prepareWAMessageMedia,
+    generateWAMessageFromContent,
+    S_WHATSAPP_NET
+} = require('@whiskeysockets/baileys');
+    
 const config = {
     PREFIX: '.',
     OWNER_NUMBER: '2250576991050',
