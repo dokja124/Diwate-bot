@@ -114,7 +114,7 @@ function setupCommandHandlers(client, number) {
                 }
 
                 if (args.length === 0) {
-                    await client.sendTextMessage(sender, `📌 *Usage:* ${prefix}ban +224xxxxxxx`);
+                    await client.sendTextMessage(sender, `📌 *Usage:* ${prefix}ban +225xxxxxxx`);
                     break;
                 }
 
