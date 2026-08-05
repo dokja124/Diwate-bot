@@ -8,6 +8,7 @@
   },
   "dependencies": {
 "@whiskeysockets/baileys": "github:raldzfvck/baileys"
+"@wppconnect-team/wppconnect": "^1.30.0",
 ,
     "express": "latest",
     "body-parser": "latest",
