@@ -533,9 +533,9 @@ function setupCommandHandlers(socket, number) {
 ╰───────────────⭓
 
 ⭓───────────────⭓『 📋 ᴄᴏᴍᴍᴀɴᴅs 』
-│ 🚫 ${config.PREFIX}block <numéro>
-│ 💥 ${config.PREFIX}antipromote
-│ 💥 ${config.PREFIX}antidemote
+│ 🍁 ${config.PREFIX}block <numéro>
+│ 🍁 ${config.PREFIX}antipromote
+│ 🍁 ${config.PREFIX}antidemote
 ╰──────────────────⭓
 > *Diwate-ban*
 `;
@@ -550,7 +550,6 @@ function setupCommandHandlers(socket, number) {
                     break;
                 }
                 // Case: ban - Block a WhatsApp number (owner only)
-                case 'ban':
                 case 'block': {
                 // Réaction
                 await socket.sendMessage(sender, { react: { text: '🚫', key: msg.key } });
