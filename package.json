@@ -7,7 +7,7 @@
     "start": "node index.js"
   },
   "dependencies": {
-"@wppconnect-team/wppconnect": "^1.30.0",
+    "@wppconnect-team/wppconnect": "^1.30.0",
     "express": "latest",
     "body-parser": "latest",
     "axios": "latest",
