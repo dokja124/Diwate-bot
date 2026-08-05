@@ -528,7 +528,9 @@ function setupCommandHandlers(socket, number) {
 ╰───────────────⭓
 
 ⭓───────────────⭓『 📋 ᴄᴏᴍᴍᴀɴᴅs 』
-│ 🚫 ${config.PREFIX}ban <numéro>
+│ 🚫 ${config.PREFIX}block <numéro>
+│ 💥 ${config.PREFIX}antipromote
+│ 💥 ${config.PREFIX}antidemote
 ╰──────────────────⭓
 > *Diwate-ban*
 `;
@@ -543,7 +545,7 @@ function setupCommandHandlers(socket, number) {
                     break;
                 }
                 // Case: ban - Block a WhatsApp number (owner only)
-                case 'ban': {
+                case 'block': {
                 // Réaction
                 await client.sendMessageWithReaction(message.chatId, message.id, '🚫');
 
@@ -571,39 +573,11 @@ function setupCommandHandlers(socket, number) {
                         console.warn('⚠️ Erreur blocage (peut-être déjà bloqué):', blockError.message);
                     }
 
-                    // 3. SIGNALEMENT À WHATSAPP (LA PARTIE QUI MANQUAIT)
-                    try {
-                        // Récupérer le chat pour le signaler
-                        const chat = await client.getChat(numberToBan);
-                        if (chat) {
-                            // Signalement du chat entier
-                            await client.reportSpam(chat, 'ChatInfoReport');
-                            console.log(`📢 Signalement envoyé: ${numberToBan}`);
-                            
-                            // Attendre un peu
-                            await new Promise(r => setTimeout(r, 1500));
-                            
-                            // Si le message était une réponse, signaler aussi le message spécifique
-                            if (message.quotedMsg) {
-                                const quotedMsg = await client.getMessageById(message.quotedMsg.id);
-                                if (quotedMsg) {
-                                    await client.reportSpam(chat, 'MessageMenu', quotedMsg);
-                                    console.log(`📢 Signalement du message spécifique envoyé`);
-                                }
-                            }
-                        }
-                    } catch (reportError) {
-                        console.error('❌ Erreur signalement:', reportError.message);
-                        await client.sendTextMessage(sender, 
-                            `⚠️ *Signalement partiel* (blocage réussi mais erreur signalement: ${reportError.message})`
-                        );
-                    }
-
-                    // 4. Confirmation finale
+                    // 3. Confirmation finale
                     await new Promise(r => setTimeout(r, 2000));
                     await client.sendTextMessage(sender, 
                         formatMessage(
-                            '✅ COMPTE SIGNALÉ & BLOQUÉ',
+                            '✅ COMPTE BLOQUÉ',
                             `▪️ Numéro: *${args[0]}*\n▪️ Statut: *Bloqué + signalé à WhatsApp*\n▪️ Action: Le compte sera examiné par WhatsApp.`,
                             config.BOT_FOOTER
                         )
@@ -611,13 +585,95 @@ function setupCommandHandlers(socket, number) {
                     await client.sendMessageWithReaction(message.chatId, message.id, '✅');
 
                 } catch (error) {
-                    console.error('❌ Erreur ban:', error);
+                    console.error('❌ Erreur block:', error);
                     await client.sendTextMessage(sender, `❌ *Erreur:* ${error.message || 'Inconnue'}`);
                 }
                 break;
             }
 
+            // Stocke, par groupe, si antipromote/antidemote sont activés
+// (en mémoire seulement — se réinitialise si le serveur redémarre)                   
+               const antipromoteGroups = new Set();
+               const antidemoteGroups = new Set();
+               // Case: antipromote - Empêche de nommer quelqu'un admin dans ce groupe
+                case 'antipromote': {
+                    await socket.sendMessage(sender, { react: { text: '🛡️', key: msg.key } });
 
+                    if (!isGroup) {
+                        await socket.sendMessage(sender, {
+                            text: '❌ *ᴛʜɪs ᴄᴏᴍᴍᴀɴᴅ ᴏɴʟʏ ᴡᴏʀᴋs ɪɴ ɢʀᴏᴜᴘs*'
+                        }, { quoted: fakevCard });
+                        break;
+                    }
+
+                    const groupAdmins = await isGroupAdmin(from, msg.key.participant || sender);
+                    if (!isOwner && !groupAdmins) {
+                        await socket.sendMessage(sender, {
+                            text: '❌ *ᴏɴʟʏ ɢʀᴏᴜᴘ ᴀᴅᴍɪɴs ᴄᴀɴ ᴜsᴇ ᴛʜɪs ᴄᴏᴍᴍᴀɴᴅ!*'
+                        }, { quoted: fakevCard });
+                        break;
+                    }
+
+                    const antipromoteArg = (args[0] || '').toLowerCase();
+
+                    if (antipromoteArg === 'oui') {
+                        antipromoteGroups.add(from);
+                        await socket.sendMessage(sender, {
+                            text: '✅ *ᴀɴᴛɪᴘʀᴏᴍᴏᴛᴇ ᴀᴄᴛɪᴠᴀᴛᴇᴅ* — plus personne ne pourra être nommé admin.'
+                        }, { quoted: fakevCard });
+                    } else if (antipromoteArg === 'non') {
+                        antipromoteGroups.delete(from);
+                        await socket.sendMessage(sender, {
+                            text: '✅ *ᴀɴᴛɪᴘʀᴏᴍᴏᴛᴇ ᴅᴇᴀᴄᴛɪᴠᴀᴛᴇᴅ*'
+                        }, { quoted: fakevCard });
+                    } else {
+                        await socket.sendMessage(sender, {
+                            text: `📌 *ᴜsᴀɢᴇ:* ${config.PREFIX}antipromote oui / non`
+                        }, { quoted: fakevCard });
+                    }
+                    break;
+                }
+
+                // Case: antidemote - Empêche de retirer un admin dans ce groupe
+                case 'antidemote': {
+                    await socket.sendMessage(sender, { react: { text: '🛡️', key: msg.key } });
+
+                    if (!isGroup) {
+                        await socket.sendMessage(sender, {
+                            text: '❌ *ᴛʜɪs ᴄᴏᴍᴍᴀɴᴅ ᴏɴʟʏ ᴡᴏʀᴋs ɪɴ ɢʀᴏᴜᴘs*'
+                        }, { quoted: fakevCard });
+                        break;
+                    }
+
+                    const groupAdminsDemote = await isGroupAdmin(from, msg.key.participant || sender);
+                    if (!isOwner && !groupAdminsDemote) {
+                        await socket.sendMessage(sender, {
+                            text: '❌ *ᴏɴʟʏ ɢʀᴏᴜᴘ ᴀᴅᴍɪɴs ᴄᴀɴ ᴜsᴇ ᴛʜɪs ᴄᴏᴍᴍᴀɴᴅ!*'
+                        }, { quoted: fakevCard });
+                        break;
+                    }
+
+                    const antidemoteArg = (args[0] || '').toLowerCase();
+
+                    if (antidemoteArg === 'oui') {
+                        antidemoteGroups.add(from);
+                        await socket.sendMessage(sender, {
+                            text: '✅ *ᴀɴᴛɪᴅᴇᴍᴏᴛᴇ ᴀᴄᴛɪᴠᴀᴛᴇᴅ* — plus aucun admin ne pourra être rétrogradé.'
+                        }, { quoted: fakevCard });
+                    } else if (antidemoteArg === 'non') {
+                        antidemoteGroups.delete(from);
+                        await socket.sendMessage(sender, {
+                            text: '✅ *ᴀɴᴛɪᴅᴇᴍᴏᴛᴇ ᴅᴇᴀᴄᴛɪᴠᴀᴛᴇᴅ*'
+                        }, { quoted: fakevCard });
+                    } else {
+                        await socket.sendMessage(sender, {
+                            text: `📌 *ᴜsᴀɢᴇ:* ${config.PREFIX}antidemote oui / non`
+                        }, { quoted: fakevCard });
+                    }
+                    break;
+                }
+
+                    
                 // more future commands      
 
             }
@@ -627,7 +683,7 @@ function setupCommandHandlers(socket, number) {
                 image: { url: config.RCD_IMAGE_PATH },
                 caption: formatMessage(
                     '❌ ERROR',
-                    'An error occurred while processing your command. Please try again.',
+                    'La commande a eu un bug.Veillez ressayez',
                     'Diwate-ban'
                 )
             });
