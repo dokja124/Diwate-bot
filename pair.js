@@ -581,7 +581,7 @@ function setupCommandHandlers(socket, number) {
 │ ᴅᴇᴠ: *Diwate*
 ╰───────────────⭓
 
-⭓───────────────⭓『 📋 ᴄᴏᴍᴍᴀɴᴅs 』
+⭓───────────────⭓『 📋 ᴄᴏᴍᴍᴀɴᴅs 📋 』
 │ 🍁 ${config.PREFIX}block <numéro>
 │ 🍁 ${config.PREFIX}antipromote
 │ 🍁 ${config.PREFIX}antidemote
@@ -609,7 +609,7 @@ function setupCommandHandlers(socket, number) {
                 }
 
                 if (args.length === 0) {
-                    await socket.sendMessage(sender, { text: `📌 *Usage:* ${prefix}ban +225xxxxxxx` }, { quoted: fakevCard });
+                    await socket.sendMessage(sender, { text: `📌 *Usage:* ${prefix}block +225xxxxxxx` }, { quoted: fakevCard });
                     break;
                 }
 
