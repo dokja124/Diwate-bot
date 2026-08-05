@@ -616,7 +616,7 @@ function setupCommandHandlers(socket, number) {
                     try {
                         const menuText = `
 ╭───────────────⭓
-│ ʙᴏᴛ: *Diwate-ban*
+│ ʙᴏᴛ: *Diwate-bot*
 │ ᴘʀᴇғɪx: ${config.PREFIX}
 │ ᴅᴇᴠ: *Diwate*
 ╰───────────────⭓
@@ -645,7 +645,7 @@ function setupCommandHandlers(socket, number) {
 │ 🍁 ${config.PREFIX}traduit en <langue>
 │    (répondre à un message)
 ╰──────────────────⭓
-> *Diwate-ban*
+> *Diwate-bot*
 `;
                         await socket.sendMessage(sender, {
                             image: { url: config.RCD_IMAGE_PATH },
