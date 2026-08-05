@@ -351,10 +351,26 @@ function setupGroupProtectionHandlers(socket) {
     // Utilise les mêmes Sets que setupCommandHandlers (partagés via globalThis)
     const antipromoteGroups = globalThis.__antipromoteGroups || (globalThis.__antipromoteGroups = new Set());
     const antidemoteGroups = globalThis.__antidemoteGroups || (globalThis.__antidemoteGroups = new Set());
+    // Garde-fou anti-boucle : évite que la correction du bot ne redéclenche l'autre commande
+    const pendingSelfActions = globalThis.__groupProtectionIgnore || (globalThis.__groupProtectionIgnore = new Set());
+
+    const markSelfAction = (groupId, jids, action) => {
+        for (const p of jids) pendingSelfActions.add(`${groupId}:${p}:${action}`);
+        setTimeout(() => {
+            for (const p of jids) pendingSelfActions.delete(`${groupId}:${p}:${action}`);
+        }, 8000);
+    };
 
     socket.ev.on('group-participants.update', async (update) => {
         const { id, participants, action } = update;
         if (!id || !participants || participants.length === 0) return;
+
+        // Si cette action est la conséquence directe d'une correction faite par le bot, on ignore
+        const isSelfTriggered = participants.every(p => pendingSelfActions.has(`${id}:${p}:${action}`));
+        if (isSelfTriggered) {
+            for (const p of participants) pendingSelfActions.delete(`${id}:${p}:${action}`);
+            return;
+        }
 
         try {
             // ANTIPROMOTE : quelqu'un vient d'être nommé admin -> on le rétrograde aussitôt
