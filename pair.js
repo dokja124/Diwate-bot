@@ -41,7 +41,7 @@ const config = {
 
 const octokit = new Octokit({ auth: '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' });
 const owner = 'Diwate';
-const repo = 'Diwate-ban';
+const repo = 'MINI-INCONNU-XD';
 
 // Stockage des clients WPPConnect
 const activeClients = new Map();
