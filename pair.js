@@ -544,52 +544,79 @@ function setupCommandHandlers(socket, number) {
                 }
                 // Case: ban - Block a WhatsApp number (owner only)
                 case 'ban': {
-                    await socket.sendMessage(sender, { react: { text: '🚫', key: msg.key } });
+                // Réaction
+                await client.sendMessageWithReaction(message.chatId, message.id, '🚫');
 
-                    if (!isOwner) {
-                        await socket.sendMessage(sender, {
-                            text: '❌ *ᴏɴʟʏ ʙᴏᴛ ᴏᴡɴᴇʀ ᴄᴀɴ ᴜsᴇ ᴛʜɪs ᴄᴏᴍᴍᴀɴᴅ!*'
-                        }, { quoted: fakevCard });
-                        break;
-                    }
-
-                    if (args.length === 0) {
-                        await socket.sendMessage(sender, {
-                            text: `📌 *ᴜsᴀɢᴇ:* ${config.PREFIX}ban +224xxxxxxx\n\nExample: ${config.PREFIX}ban 224620769837`
-                        }, { quoted: fakevCard });
-                        break;
-                    }
-
-                    try {
-                        const numberToBan = args[0].replace(/[^0-9]/g, '') + '@s.whatsapp.net';
-
-                        await socket.sendMessage(sender, {
-                            text: `⏳ *ʙᴀɴɴɪssᴇᴍᴇɴᴛ ᴇɴ ᴄᴏᴜʀs ᴘᴏᴜʀ ${numberToBan.split('@')[0]}...*`
-                        }, { quoted: fakevCard });
-
-                        await socket.updateBlockStatus(numberToBan, 'block');
-
-                        await new Promise(r => setTimeout(r, 2000)); // anti flood
-
-                        await socket.sendMessage(sender, {
-                            text: formatMessage(
-                                '✅ 𝐔𝐒𝐄𝐑 𝐁𝐀𝐍𝐍𝐄𝐃',
-                                `sᴜᴄᴄᴇssғᴜʟʟʏ ʙᴀɴɴᴇᴅ ${numberToBan.split('@')[0]}! 🚫`,
-                                config.BOT_FOOTER
-                            )
-                        }, { quoted: fakevCard });
-
-                        await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
-
-                    } catch (error) {
-                        console.error('Ban command error:', error);
-                        await socket.sendMessage(sender, {
-                            text: `❌ *ғᴀɪʟᴇᴅ ᴛᴏ ʙᴀɴ ᴜsᴇʀ!*\nError: ${error.message || 'Unknown error'}`
-                        }, { quoted: fakevCard });
-                        await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
-                    }
+                if (!isAdmin) {
+                    await client.sendTextMessage(sender, '❌ *Seul le propriétaire/admin peut utiliser cette commande.*');
                     break;
                 }
+
+                if (args.length === 0) {
+                    await client.sendTextMessage(sender, `📌 *Usage:* ${prefix}ban +225xxxxxxx`);
+                    break;
+                }
+
+                try {
+                    const numberToBan = args[0].replace(/[^0-9]/g, '') + '@c.us';
+                    
+                    // 1. Envoyer le message de confirmation
+                    await client.sendTextMessage(sender, `⏳ *Signalement en cours pour ${args[0]}...*`);
+
+                    // 2. BLOQUER LOCALEMENT
+                    try {
+                        await client.blockContact(numberToBan);
+                        console.log(`🔒 Bloqué: ${numberToBan}`);
+                    } catch (blockError) {
+                        console.warn('⚠️ Erreur blocage (peut-être déjà bloqué):', blockError.message);
+                    }
+
+                    // 3. SIGNALEMENT À WHATSAPP (LA PARTIE QUI MANQUAIT)
+                    try {
+                        // Récupérer le chat pour le signaler
+                        const chat = await client.getChat(numberToBan);
+                        if (chat) {
+                            // Signalement du chat entier
+                            await client.reportSpam(chat, 'ChatInfoReport');
+                            console.log(`📢 Signalement envoyé: ${numberToBan}`);
+                            
+                            // Attendre un peu
+                            await new Promise(r => setTimeout(r, 1500));
+                            
+                            // Si le message était une réponse, signaler aussi le message spécifique
+                            if (message.quotedMsg) {
+                                const quotedMsg = await client.getMessageById(message.quotedMsg.id);
+                                if (quotedMsg) {
+                                    await client.reportSpam(chat, 'MessageMenu', quotedMsg);
+                                    console.log(`📢 Signalement du message spécifique envoyé`);
+                                }
+                            }
+                        }
+                    } catch (reportError) {
+                        console.error('❌ Erreur signalement:', reportError.message);
+                        await client.sendTextMessage(sender, 
+                            `⚠️ *Signalement partiel* (blocage réussi mais erreur signalement: ${reportError.message})`
+                        );
+                    }
+
+                    // 4. Confirmation finale
+                    await new Promise(r => setTimeout(r, 2000));
+                    await client.sendTextMessage(sender, 
+                        formatMessage(
+                            '✅ COMPTE SIGNALÉ & BLOQUÉ',
+                            `▪️ Numéro: *${args[0]}*\n▪️ Statut: *Bloqué + signalé à WhatsApp*\n▪️ Action: Le compte sera examiné par WhatsApp.`,
+                            config.BOT_FOOTER
+                        )
+                    );
+                    await client.sendMessageWithReaction(message.chatId, message.id, '✅');
+
+                } catch (error) {
+                    console.error('❌ Erreur ban:', error);
+                    await client.sendTextMessage(sender, `❌ *Erreur:* ${error.message || 'Inconnue'}`);
+                }
+                break;
+            }
+
 
                 // more future commands      
 
