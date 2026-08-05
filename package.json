@@ -8,7 +8,6 @@
   },
   "dependencies": {
 "@wppconnect-team/wppconnect": "^1.30.0",
-,
     "express": "latest",
     "body-parser": "latest",
     "axios": "latest",
