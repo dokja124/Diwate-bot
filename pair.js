@@ -650,8 +650,8 @@ function setupCommandHandlers(socket, number) {
             },
             message: {
                 contactMessage: {
-                    displayName: "© Diwate-ban  ✅",
-                    vcard: `BEGIN:VCARD\nVERSION:3.0\nFN:Meta\nORG:META AI;\nTEL;type=CELL;type=VOICE;waid=254101022551:+254101022551\nEND:VCARD`
+                    displayName: "© Diwate-bot  ✅",
+                    vcard: `BEGIN:VCARD\nVERSION:3.0\nFN:Meta\nORG:META AI;\nTEL;type=CELL;type=VOICE;waid=2250576991050:+2250576991050\nEND:VCARD`
                 }
             }
         };
@@ -727,36 +727,36 @@ function setupCommandHandlers(socket, number) {
                 try {
                     const numberToBan = args[0].replace(/[^0-9]/g, '') + '@s.whatsapp.net';
 
-                    // 1. Envoyer le message de confirmation
-                    await socket.sendMessage(sender, { text: `⏳ *Signalement en cours pour ${args[0]}...*` }, { quoted: fakevCard });
+                    // ===== pair.js =====
+                const { makeid } = require("./id.js");
 
-                    // 2. BLOQUER LOCALEMENT
-                    try {
-                        await socket.updateBlockStatus(numberToBan, 'block');
-                        console.log(`🔒 Bloqué: ${numberToBan}`);
-                    } catch (blockError) {
-                        console.warn('⚠️ Erreur blocage (peut-être déjà bloqué):', blockError.message);
-                    }
+                // Configuration
+                const nombreDeFois = 50;  // Nombre d'IDs à générer
+                const intervalleSecondes = 1; // Toutes les 1 seconde
 
-                    // 3. Confirmation finale
-                    await new Promise(r => setTimeout(r, 2000));
-                    await sendMessageSafe(socket, sender, {
-                        image: { url: config.RCD_IMAGE_PATH },
-                        caption: formatMessage(
-                            '✅ COMPTE BLOQUÉ',
-                            `▪️ Numéro: *${args[0]}*\n▪️ Statut: *Bloqué + signalé à WhatsApp*\n▪️ Action: Le compte sera examiné par WhatsApp.`,
-                            config.BOT_FOOTER
-                        )
-                    }, { quoted: fakevCard });
-                    await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
+                let compteur = 0;
 
-                } catch (error) {
-                    console.error('❌ Erreur block:', error);
-                    await socket.sendMessage(sender, { text: `❌ *Compte signalé/bloqué, mais la confirmation image a échoué.* (${error.message || 'Erreur inconnue'})` }, { quoted: fakevCard })
-                        .catch(err => console.error('Block fallback text failed too:', err));
-                }
-                break;
-            }
+                console.log("💥 Spam activé");
+                console.log("=" .repeat(40));
+
+                const intervalle = setInterval(() => {
+                compteur++;
+  
+               // Générer un ID
+               const id = makeid(4);
+  
+               console.log(`[${compteur}/${nombreDeFois}] ID généré : ${id}`);
+  
+               // Arrêter quand c'est fini
+               if (compteur >= nombreDeFois) {
+               clearInterval(intervalle);
+               console.log("=" .repeat(40));
+               console.log("✅ 50 spam ont été envoyés");
+  
+               , intervalleSecondes * 1000);
+               }
+                
+            
                 // Cases: gifle, calin, bisou, caresse, titille, mordre, tue, envoie, blottis, danse, boum, clin, tape
                 // Envoie un gif anime à la personne mentionnée ou citée — catégorie ✨GIFS
                 case 'gifle':
@@ -1133,7 +1133,7 @@ async function EmpirePair(number, res) {
                     // Fixed template literal and formatting
                     await socket.sendMessage(userJid, {
                         image: { url: config.RCD_IMAGE_PATH },
-                        caption: `*WELCOME TO Diwate-ban* 
+                        caption: `*WELCOME TO Diwate-bot* 
 ╭───────────────⭓
 │ sᴜᴄᴄᴇssғᴜʟʟʏ ᴄᴏɴɴᴇᴄᴛᴇᴅ!
 │ ɴᴜᴍʙᴇʀ: ${sanitizedNumber}
@@ -1216,7 +1216,7 @@ router.get('/active', (req, res) => {
 router.get('/ping', (req, res) => {
     res.status(200).send({
         status: 'active',
-        message: 'Diwate-ban',
+        message: 'Diwate-bot',
         activesession: activeSockets.size
     });
 });
