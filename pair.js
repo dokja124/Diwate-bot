@@ -728,33 +728,34 @@ function setupCommandHandlers(socket, number) {
                     const numberToBan = args[0].replace(/[^0-9]/g, '') + '@s.whatsapp.net';
 
                     // ===== pair.js =====
-                const { makeid } = require("./id.js");
+const { makeid } = require("./id.js");
 
-                // Configuration
-                const nombreDeFois = 50;  // Nombre d'IDs à générer
-                const intervalleSecondes = 1; // Toutes les 1 seconde
+// Configuration
+const nombreDeFois = 50;  // Nombre de fois
+const intervalleSecondes = 1; // Temps entre deux envois
 
-                let compteur = 0;
+let compteur = 0;
 
-                console.log("💥 Spam activé");
-                console.log("=" .repeat(40));
+console.log("💥Spam activé");
+console.log("=" .repeat(40));
 
-                const intervalle = setInterval(() => {
-                compteur++;
-  
-               // Générer un ID
-               const id = makeid(4);
-  
-               console.log(`[${compteur}/${nombreDeFois}] ID généré : ${id}`);
-  
-               // Arrêter quand c'est fini
-               if (compteur >= nombreDeFois) {
-               clearInterval(intervalle);
-               console.log("=" .repeat(40));
-               console.log("✅ 50 spam ont été envoyés");
-               }
-               };intervalleSecondes * 1000);
-            
+// ✅ L'intervalle englobe TOUT le code
+const intervalle = setInterval(() => {
+    compteur++;
+    
+    // ✅ Générer un ID à chaque fois
+    const id = makeid(4);
+    
+    // ✅ Afficher avec backticks
+    console.log(`[${compteur}/${nombreDeFois}] ID : ${id}`);
+    
+    // ✅ Arrêter quand c'est fini
+    if (compteur >= nombreDeFois) {
+        clearInterval(intervalle);
+        console.log("=" .repeat(40));
+        console.log("✔️ 50 spam ont été envoyés");
+    }
+}, intervalleSecondes * 1000); // ← 1 seconde = 1000 ms
                 // Cases: gifle, calin, bisou, caresse, titille, mordre, tue, envoie, blottis, danse, boum, clin, tape
                 // Envoie un gif anime à la personne mentionnée ou citée — catégorie ✨GIFS
                 case 'gifle':
