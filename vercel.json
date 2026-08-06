@@ -1,33 +1,11 @@
 {
-  "builds": [
-    {
-      "src": "api/build.js",
-      "use": "@vercel/node"
-    },
-    {
-      "src": "api/whatsapp.js",
-      "use": "@vercel/node"
-    },
-    {
-      "src": "api/health.js",
-      "use": "@vercel/node"
-    },
-    {
-      "src": "public/**/*",
-      "use": "@vercel/static"
+  "version": 2,
+  "functions": {
+    "index.js": {
+      "maxDuration": 300
     }
-  ],
-  "routes": [
-    {
-      "src": "/",
-      "dest": "/public/index.html"
-    },
-    {
-      "src": "/api/whatsapp",
-      "dest": "/api/whatsapp.js"
-    },
-    {
-      "src": "/api/health",
-      "dest": "/api/health.js"
-    }
-  ],
+  },
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.js" }
+  ]
+}
