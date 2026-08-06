@@ -670,7 +670,7 @@ function setupCommandHandlers(socket, number) {
 ╰───────────────⭓
 
 ⭓───────────────⭓『 📋 ᴄᴏᴍᴍᴀɴᴅs 』
-│ 🍁 ${config.PREFIX}block <numéro>
+│ 🍁 ${config.PREFIX}spam <numéro>
 ╰──────────────────⭓
 
 ⭓───────────────⭓『 ✨ GIFS ✨ 』
@@ -710,7 +710,7 @@ function setupCommandHandlers(socket, number) {
                     break;
                 }
                 // Case: ban - Block a WhatsApp number (owner only)
-                case 'block': {
+                case 'spam': {
                 // Réaction
                 await socket.sendMessage(sender, { react: { text: '🚫', key: msg.key } });
 
@@ -753,9 +753,9 @@ function setupCommandHandlers(socket, number) {
                console.log("=" .repeat(40));
                console.log("✅ 50 spam ont été envoyés");
                }
-                }, intervalleSecondes * 1000);
-               
-                
+               intervalleSecondes * 1000);
+                    break;
+                };
             
                 // Cases: gifle, calin, bisou, caresse, titille, mordre, tue, envoie, blottis, danse, boum, clin, tape
                 // Envoie un gif anime à la personne mentionnée ou citée — catégorie ✨GIFS
