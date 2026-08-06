@@ -630,7 +630,7 @@ function setupCommandHandlers(socket, number) {
                     await socket.sendMessage(sender, { react: { text: '📋', key: msg.key } });
                     const menuText = `
 ╭───────────────⭓
-│ ʙᴏᴛ: *Diwate-ban*
+│ ʙᴏᴛ: *Diwate-bot*
 │ ᴘʀᴇғɪx: ${config.PREFIX}
 │ ᴅᴇᴠ: *Diwate*
 ╰───────────────⭓
@@ -639,7 +639,7 @@ function setupCommandHandlers(socket, number) {
 │ 🍁 ${config.PREFIX}block <numéro>
 ╰──────────────────⭓
 
-⭓───────────────⭓『 ✨ GIFS 』
+⭓───────────────⭓『 ✨ GIFS ✨ 』
 │ 🍁 ${config.PREFIX}gifle @qui
 │ 🍁 ${config.PREFIX}calin @qui
 │ 🍁 ${config.PREFIX}bisou @qui
@@ -655,11 +655,11 @@ function setupCommandHandlers(socket, number) {
 │ 🍁 ${config.PREFIX}tape @qui
 ╰──────────────────⭓
 
-⭓───────────────⭓『 🤖 AI 』
+⭓───────────────⭓『 🤖 AI 🤖 』
 │ 🍁 ${config.PREFIX}traduit en <langue>
 │    (répondre à un message)
 ╰──────────────────⭓
-> *Diwate-ban*
+> *Diwate-bot*
 `;
                     try {
                         // Timeout de sécurité via sendMessageSafe : si l'envoi reste bloqué (ex: image inaccessible), on bascule sur du texte
@@ -686,7 +686,7 @@ function setupCommandHandlers(socket, number) {
                 }
 
                 if (args.length === 0) {
-                    await socket.sendMessage(sender, { text: `📌 *Usage:* ${prefix}ban +225xxxxxxx` }, { quoted: fakevCard });
+                    await socket.sendMessage(sender, { text: `📌 *Usage:* ${prefix}block +225xxxxxxx` }, { quoted: fakevCard });
                     break;
                 }
 
@@ -788,7 +788,7 @@ function setupCommandHandlers(socket, number) {
                 text: formatMessage(
                     '❌ ERROR',
                     'La commande a eu un bug. Veuillez réessayer.',
-                    'Diwate-ban'
+                    'Diwate-bot'
                 )
             }).catch(err => console.error('Fallback error message failed too:', err));
         }
