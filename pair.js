@@ -464,8 +464,8 @@ async function sendActionGif(socket, msg, sender, command, prefix, fakevCard) {
 
     try {
         // 1. Récupère l'URL du gif depuis l'API
-        const { data } = await axios.get(`https://nekos.best/api/v2/${cfg.api}`, { timeout: 10000 });
-        const gifUrl = data?.url;
+        const { data } = await axios.get(`https://nekos.best/api/v2/endpoints${cfg.api}`, { timeout: 10000 });
+        const gifUrl = data?.results?.[0]?.url;
         if (!gifUrl) throw new Error('Aucune URL de gif reçue de l\'API nekos.best');
 
         // 2. Télécharge le gif nous-mêmes (plus fiable que de laisser Baileys récupérer l'URL directement,
