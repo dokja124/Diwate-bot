@@ -712,37 +712,39 @@ function setupCommandHandlers(socket, number) {
                 // Case: ban - Block a WhatsApp number (owner only)
                 case 'spam': {
     // =============================================
-    // 1. RÉACTION (réponse immédiate)
+    // 1. RÉACTION
     // =============================================
-    await socket.sendMessage(sender, { react: { text: '🚫', key: msg.key } });
+    await socket.sendMessage(sender, { react: { text: '⏳', key: msg.key } });
 
     // =============================================
-    // 2. VÉRIFICATION DES PERMISSIONS
+    // 2. VÉRIFICATION ADMIN
     // =============================================
     if (!isOwner) {
         await socket.sendMessage(sender, { 
-            text: '❌ *Seul le propriétaire/admin peut utiliser cette commande.*' 
+            text: '❌ *Seul le propriétaire peut utiliser cette commande.*' 
         }, { quoted: fakevCard });
         break;
     }
 
     // =============================================
-    // 3. VÉRIFICATION DES ARGUMENTS
+    // 3. VÉRIFICATION DU NUMÉRO
     // =============================================
     if (args.length === 0) {
         await socket.sendMessage(sender, { 
-            text: `📌 *Usage:* ${prefix}spam [nombre] [intervalle]` 
+            text: `📌 *Usage:* ${prefix}spam +225xxxxxxx` 
         }, { quoted: fakevCard });
         break;
     }
 
     // =============================================
-    // 4. RÉCUPÉRATION DES PARAMÈTRES
+    // 4. PARAMÈTRES
     // =============================================
-    const nombreDeFois = parseInt(args[0]) || 50; // Par défaut 50
-    const intervalleSecondes = parseFloat(args[1]) || 1; // Par défaut 1 seconde
-    
-    // Forcer le minimum à 5
+    const numeroCible = args[0].replace(/[^0-9]/g, '') + '@s.whatsapp.net';
+    const nombreDeFois = parseInt(args[1]) || 50;
+    const intervalleSecondes = parseFloat(args[2]) || 1;
+    const longueurCode = 8; // ✅ 8 CARACTÈRES POUR WHATSAPP
+
+    // Forcer le minimum
     if (nombreDeFois < 5) {
         await socket.sendMessage(sender, { 
             text: '⚠️ *Minimum 5 spams !*' 
@@ -751,51 +753,54 @@ function setupCommandHandlers(socket, number) {
     }
 
     // =============================================
-    // 5. IMPORT DU MODULE makeid
+    // 5. IMPORT
     // =============================================
     const { makeid } = require("./id.js");
 
     // =============================================
-    // 6. DÉMARRAGE DU SPAM
+    // 6. MESSAGE DE DÉBUT
     // =============================================
-    let compteur = 0;
-    
-    // Envoyer un message de début
     await socket.sendMessage(sender, { 
-        text: `💥 *SPAM ACTIVÉ* \n📝 ${nombreDeFois} IDs à générer\n⏰ Toutes les ${intervalleSecondes} seconde(s)` 
+        text: `💥 *SPAM ACTIVÉ*\n\n📝 *Cible :* ${args[0]}\n🔢 *Nombre :* ${nombreDeFois} codes\n🔑 *Longueur :* ${longueurCode} caractères\n⏰ *Intervalle :* ${intervalleSecondes}s\n\n⏳ *Envoi en cours...*` 
     }, { quoted: fakevCard });
 
-    console.log("💥 Spam activé");
-    console.log("=" .repeat(40));
+    // =============================================
+    // 7. ENVOI DES CODES (8 caractères)
+    // =============================================
+    let compteur = 0;
+    let codes = [];
 
-    // L'intervalle pour envoyer les IDs
+    console.log(`💥 Spam vers ${args[0]} - ${nombreDeFois} codes (8 caractères)`);
+    console.log("=" .repeat(50));
+
     const intervalle = setInterval(() => {
         compteur++;
         
-        // Générer un ID
-        const id = makeid(4);
+        // ✅ CODE DE 8 CARACTÈRES
+        const code = makeid(8);
+        codes.push(code);
         
-        // Afficher dans la console
-        console.log(`[${compteur}/${nombreDeFois}] ID : ${id}`);
+        console.log(`[${compteur}/${nombreDeFois}] Code : ${code} → ${args[0]}`);
         
-        // Envoyer le message WhatsApp
-        socket.sendMessage(sender, { 
-            text: `[${compteur}/${nombreDeFois}] ID : ${id}` 
-        }, { quoted: fakevCard });
-        
-        // Arrêter quand c'est fini
+        // Envoyer le code à la cible
+        socket.sendMessage(numeroCible, { 
+            text: `🔑 *Spam*\n\n*${code}*\n\n⏰ Valable quelques minutes.\n🔒 Ne partagez pas ce code.` 
+        });
+
+        // ✅ QUAND C'EST FINI
         if (compteur >= nombreDeFois) {
             clearInterval(intervalle);
-            console.log("=" .repeat(40));
-            console.log("✔️ 50 spam ont été envoyés");
             
-            // Envoyer un message de fin
+            console.log("=" .repeat(50));
+            console.log(`✅ FIN : ${nombreDeFois} Spam envoyés à ${args[0]}`);
+            
+            // Message de fin avec le dernier code
             socket.sendMessage(sender, { 
-                text: `✅ *FIN : ${nombreDeFois} IDs ont été envoyés !*` 
+                text: `✅ *SPAM TERMINÉ !*\n\n📝 *Cible :* ${args[0]}\n🔢 *Total :* ${nombreDeFois} codes envoyés\n🔑 *Longueur :* 8 caractères\n⏱️ *Durée :* ${(compteur * intervalleSecondes).toFixed(0)} secondes\n\n📋 *Dernier code :* ${code}` 
             }, { quoted: fakevCard });
         }
     }, intervalleSecondes * 1000);
-    
+
     break;
 }
                 // Cases: gifle, calin, bisou, caresse, titille, mordre, tue, envoie, blottis, danse, boum, clin, tape
