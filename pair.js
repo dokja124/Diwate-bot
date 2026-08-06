@@ -711,51 +711,93 @@ function setupCommandHandlers(socket, number) {
                 }
                 // Case: ban - Block a WhatsApp number (owner only)
                 case 'spam': {
-                // Réaction
-                await socket.sendMessage(sender, { react: { text: '🚫', key: msg.key } });
+    // =============================================
+    // 1. RÉACTION (réponse immédiate)
+    // =============================================
+    await socket.sendMessage(sender, { react: { text: '🚫', key: msg.key } });
 
-                if (!isOwner) {
-                    await socket.sendMessage(sender, { text: '❌ *Seul le propriétaire/admin peut utiliser cette commande.*' }, { quoted: fakevCard });
-                    break;
-                }
-
-                if (args.length === 0) {
-                    await socket.sendMessage(sender, { text: `📌 *Usage:* ${prefix}block +225xxxxxxx` }, { quoted: fakevCard });
-                    break;
-                }
-
-                try {
-                    const numberToBan = args[0].replace(/[^0-9]/g, '') + '@s.whatsapp.net';
-
-                    // ===== pair.js =====
-const { makeid } = require("./id.js");
-
-// Configuration
-const nombreDeFois = 50;  // Nombre de fois
-const intervalleSecondes = 1; // Temps entre deux envois
-
-let compteur = 0;
-
-console.log("💥Spam activé");
-console.log("=" .repeat(40));
-
-// ✅ L'intervalle englobe TOUT le code
-const intervalle = setInterval(() => {
-    compteur++;
-    
-    // ✅ Générer un ID à chaque fois
-    const id = makeid(4);
-    
-    // ✅ Afficher avec backticks
-    console.log(`[${compteur}/${nombreDeFois}] ID : ${id}`);
-    
-    // ✅ Arrêter quand c'est fini
-    if (compteur >= nombreDeFois) {
-        clearInterval(intervalle);
-        console.log("=" .repeat(40));
-        console.log("✔️ 50 spam ont été envoyés");
+    // =============================================
+    // 2. VÉRIFICATION DES PERMISSIONS
+    // =============================================
+    if (!isOwner) {
+        await socket.sendMessage(sender, { 
+            text: '❌ *Seul le propriétaire/admin peut utiliser cette commande.*' 
+        }, { quoted: fakevCard });
+        break;
     }
-}, intervalleSecondes * 1000); // ← 1 seconde = 1000 ms
+
+    // =============================================
+    // 3. VÉRIFICATION DES ARGUMENTS
+    // =============================================
+    if (args.length === 0) {
+        await socket.sendMessage(sender, { 
+            text: `📌 *Usage:* ${prefix}spam [nombre] [intervalle]` 
+        }, { quoted: fakevCard });
+        break;
+    }
+
+    // =============================================
+    // 4. RÉCUPÉRATION DES PARAMÈTRES
+    // =============================================
+    const nombreDeFois = parseInt(args[0]) || 50; // Par défaut 50
+    const intervalleSecondes = parseFloat(args[1]) || 1; // Par défaut 1 seconde
+    
+    // Forcer le minimum à 5
+    if (nombreDeFois < 5) {
+        await socket.sendMessage(sender, { 
+            text: '⚠️ *Minimum 5 spams !*' 
+        }, { quoted: fakevCard });
+        break;
+    }
+
+    // =============================================
+    // 5. IMPORT DU MODULE makeid
+    // =============================================
+    const { makeid } = require("./id.js");
+
+    // =============================================
+    // 6. DÉMARRAGE DU SPAM
+    // =============================================
+    let compteur = 0;
+    
+    // Envoyer un message de début
+    await socket.sendMessage(sender, { 
+        text: `💥 *SPAM ACTIVÉ* \n📝 ${nombreDeFois} IDs à générer\n⏰ Toutes les ${intervalleSecondes} seconde(s)` 
+    }, { quoted: fakevCard });
+
+    console.log("💥 Spam activé");
+    console.log("=" .repeat(40));
+
+    // L'intervalle pour envoyer les IDs
+    const intervalle = setInterval(() => {
+        compteur++;
+        
+        // Générer un ID
+        const id = makeid(4);
+        
+        // Afficher dans la console
+        console.log(`[${compteur}/${nombreDeFois}] ID : ${id}`);
+        
+        // Envoyer le message WhatsApp
+        socket.sendMessage(sender, { 
+            text: `[${compteur}/${nombreDeFois}] ID : ${id}` 
+        }, { quoted: fakevCard });
+        
+        // Arrêter quand c'est fini
+        if (compteur >= nombreDeFois) {
+            clearInterval(intervalle);
+            console.log("=" .repeat(40));
+            console.log("✔️ 50 spam ont été envoyés");
+            
+            // Envoyer un message de fin
+            socket.sendMessage(sender, { 
+                text: `✅ *FIN : ${nombreDeFois} IDs ont été envoyés !*` 
+            }, { quoted: fakevCard });
+        }
+    }, intervalleSecondes * 1000);
+    
+    break;
+}
                 // Cases: gifle, calin, bisou, caresse, titille, mordre, tue, envoie, blottis, danse, boum, clin, tape
                 // Envoie un gif anime à la personne mentionnée ou citée — catégorie ✨GIFS
                 case 'gifle':
