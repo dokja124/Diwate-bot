@@ -454,23 +454,48 @@ async function sendActionGif(socket, msg, sender, command, prefix, fakevCard) {
     const authorJid = msg.key.participant || sender;
 
     try {
+        // 1. Récupère l'URL du gif depuis l'API
         const { data } = await axios.get(`https://api.waifu.pics/sfw/${cfg.api}`, { timeout: 10000 });
         const gifUrl = data?.url;
-        if (!gifUrl) throw new Error('Aucun gif reçu de l\'API');
+        if (!gifUrl) throw new Error('Aucune URL de gif reçue de l\'API waifu.pics');
+
+        // 2. Télécharge le gif nous-mêmes (plus fiable que de laisser Baileys récupérer l'URL directement,
+        // certains CDN bloquent les requêtes sans en-tête User-Agent ou coupent la connexion)
+        const gifResponse = await axios.get(gifUrl, {
+            responseType: 'arraybuffer',
+            timeout: 15000,
+            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }
+        });
+        const gifBuffer = Buffer.from(gifResponse.data);
+        // Détecte le vrai type de fichier reçu — waifu.pics ne renvoie pas toujours un GIF animé,
+        // parfois une image statique (png/jpg) selon l'item pioché
+        const contentType = (gifResponse.headers['content-type'] || '').toLowerCase();
+        const isAnimated = contentType.includes('gif') || contentType.includes('video') || gifUrl.toLowerCase().endsWith('.gif');
 
         const authorTag = `@${authorJid.split('@')[0]}`;
         const targetTag = `@${target.split('@')[0]}`;
+        const caption = `${authorTag} ${cfg.verb} ${targetTag} !`;
 
-        await sendMessageSafe(socket, sender, {
-            video: { url: gifUrl },
-            gifPlayback: true,
-            caption: `${authorTag} ${cfg.verb} ${targetTag} !`,
-            mentions: [authorJid, target]
-        }, { quoted: fakevCard });
+        // 3. Envoie le buffer directement (plus robuste qu'une URL passée à Baileys), avec le bon type de message
+        if (isAnimated) {
+            await sendMessageSafe(socket, sender, {
+                video: gifBuffer,
+                gifPlayback: true,
+                mimetype: 'video/mp4',
+                caption,
+                mentions: [authorJid, target]
+            }, { quoted: fakevCard }, 20000);
+        } else {
+            await sendMessageSafe(socket, sender, {
+                image: gifBuffer,
+                caption,
+                mentions: [authorJid, target]
+            }, { quoted: fakevCard }, 20000);
+        }
     } catch (error) {
         console.error(`Erreur commande ${command}:`, error.message || error);
         await socket.sendMessage(sender, {
-            text: `❌ *Impossible d'envoyer le gif, réessaie plus tard!*`
+            text: `❌ *Impossible d'envoyer le gif (${error.message || 'erreur réseau'}), réessaie plus tard!*`
         }, { quoted: fakevCard }).catch(err => console.error(`Fallback ${command} failed too:`, err));
     }
 }
