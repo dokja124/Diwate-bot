@@ -12,6 +12,15 @@ const crypto = require('crypto');
 const axios = require('axios');
 const FormData = require("form-data");
 const os = require('os');
+const dns = require('dns');
+// Corrige un bug fréquent sur Render/certains hébergeurs cloud : Node.js tente la résolution DNS
+// en IPv6 par défaut, ce qui échoue (ENOTFOUND) si le réseau de l'hébergeur ne le supporte pas bien.
+// On force IPv4 en priorité, ce qui règle la majorité des erreurs "getaddrinfo ENOTFOUND".
+try {
+    dns.setDefaultResultOrder('ipv4first');
+} catch (e) {
+    console.warn('dns.setDefaultResultOrder non disponible (nécessite Node 17+) :', e.message);
+}
 const { sms, downloadMediaMessage } = require("./msg");
 const {
     default: makeWASocket,
