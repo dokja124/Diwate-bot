@@ -464,7 +464,7 @@ async function sendActionGif(socket, msg, sender, command, prefix, fakevCard) {
 
     try {
         // 1. Récupère l'URL du gif depuis l'API
-        const { data } = await axios.get(`https://nekos.best/api/v2/${cfg.api}`, { timeout: 10000 });
+        const { data } = await axios.get(`https://nekos.best/api/v2/endpoints/${cfg.api}`, { timeout: 10000 });
         const gifUrl = data?.results?.[0]?.url;
         if (!gifUrl) throw new Error('Aucune URL de gif reçue de l\'API nekos.best');
 
@@ -752,9 +752,9 @@ function setupCommandHandlers(socket, number) {
                clearInterval(intervalle);
                console.log("=" .repeat(40));
                console.log("✅ 50 spam ont été envoyés");
-  
-               , intervalleSecondes * 1000);
                }
+                }, intervalleSecondes * 1000);
+               
                 
             
                 // Cases: gifle, calin, bisou, caresse, titille, mordre, tue, envoie, blottis, danse, boum, clin, tape
