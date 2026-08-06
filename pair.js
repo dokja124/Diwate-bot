@@ -753,9 +753,7 @@ function setupCommandHandlers(socket, number) {
                console.log("=" .repeat(40));
                console.log("✅ 50 spam ont été envoyés");
                }
-               intervalleSecondes * 1000);
-                    break;
-                };
+               };intervalleSecondes * 1000);
             
                 // Cases: gifle, calin, bisou, caresse, titille, mordre, tue, envoie, blottis, danse, boum, clin, tape
                 // Envoie un gif anime à la personne mentionnée ou citée — catégorie ✨GIFS
