@@ -1,68 +1,68 @@
-/**
- * react.js — Commandes de réaction (gifs anime) via l'API nekos.best
- * ---------------------------------------------------------------
- * API utilisée : https://nekos.best/api/v2/<catégorie>
- * (100% SFW, gratuite, sans clé API)
- *
- * Comment l'intégrer dans pair.js :
- * ----------------------------------
- * 1. En haut de pair.js, ajoute :
- *      const { REACTIONS, handleReaction } = require('./react');
- *
- * 2. Dans setupCommandHandlers(), juste après la ligne :
- *      if (!command) return;
- *    ajoute :
- *      if (REACTIONS[command]) {
- *          await handleReaction(socket, msg, sender, isGroup, command, args, nowsender);
- *          return;
- *      }
- *
- * C'est tout : les 15 commandes ci-dessous fonctionneront automatiquement,
- * sans toucher au gros switch/case existant.
- */
-
 const axios = require('axios');
 
-// Commande (en français) -> { endpoint nekos.best, verbe utilisé dans le texte }
+// Commande (en français) -> { search term, verbe utilisé dans le texte }
 const REACTIONS = {
-    gifle:    { endpoint: 'slap',   verb: 'gifle' },
-    tape:     { endpoint: 'punch',  verb: 'frappe' },
-    boum:     { endpoint: 'kick',   verb: 'donne un coup de pied à' },
-    tue:      { endpoint: 'shoot',  verb: 'tire sur' },
-    calin:    { endpoint: 'hug',    verb: 'fait un câlin à' },
-    blottis:  { endpoint: 'cuddle', verb: 'se blottit contre' },
-    bisou:    { endpoint: 'kiss',   verb: 'embrasse' },
-    embrasse: { endpoint: 'kiss',   verb: 'embrasse' },
-    caresse:  { endpoint: 'pat',    verb: 'caresse' },
-    titille:  { endpoint: 'tickle', verb: 'chatouille' },
-    mordre:   { endpoint: 'bite',   verb: 'mord' },
-    envoie:   { endpoint: 'yeet',   verb: 'envoie valser' },
-    danse:    { endpoint: 'dance',  verb: 'danse avec' },
-    clin:     { endpoint: 'wink',   verb: 'fait un clin d\'œil à' },
-    sourire:  { endpoint: 'smile',  verb: 'sourit à' },
-    coucou:   { endpoint: 'wave',   verb: 'salue' },
-    triste:   { endpoint: 'cry',    verb: 'pleure devant' },
-    dodo:     { endpoint: 'sleep',  verb: 's\'endort avec' },
-    content:  { endpoint: 'happy',  verb: 'est content(e) avec' },
+    gifle:    { search: 'slap anime',    verb: 'gifle' },
+    tape:     { search: 'punch anime',   verb: 'frappe' },
+    boum:     { search: 'kick anime',    verb: 'donne un coup de pied à' },
+    tue:      { search: 'shoot anime',   verb: 'tire sur' },
+    calin:    { search: 'hug anime',     verb: 'fait un câlin à' },
+    blottis:  { search: 'cuddle anime',  verb: 'se blottit contre' },
+    bisou:    { search: 'kiss anime',    verb: 'embrasse' },
+    embrasse: { search: 'kiss anime',    verb: 'embrasse' },
+    caresse:  { search: 'pat anime',     verb: 'caresse' },
+    titille:  { search: 'tickle anime',  verb: 'chatouille' },
+    mordre:   { search: 'bite anime',    verb: 'mord' },
+    envoie:   { search: 'yeet anime',    verb: 'envoie valser' },
+    danse:    { search: 'dance anime',   verb: 'danse avec' },
+    clin:     { search: 'wink anime',    verb: 'fait un clin d\'œil à' },
+    sourire:  { search: 'smile anime',   verb: 'sourit à' },
+    coucou:   { search: 'wave anime',    verb: 'salue' },
+    triste:   { search: 'cry anime',     verb: 'pleure devant' },
+    dodo:     { search: 'sleep anime',   verb: 's\'endort avec' },
+    content:  { search: 'happy anime',   verb: 'est content(e) avec' },
 };
 
 /**
- * Récupère un gif aléatoire depuis nekos.best pour une catégorie donnée.
+ * Récupère un gif aléatoire depuis l'API interne de Discord (Tenor)
+ * pour un terme de recherche donné.
  */
-async function fetchNekoGif(endpoint) {
-    const { data } = await axios.get(`https://nekos.best/api/v2/${endpoint}`, {
-        timeout: 10000
-    });
-    const result = data?.results?.[0];
-    if (!result?.url) throw new Error(`Aucun résultat pour la catégorie "${endpoint}"`);
-    return result;
+async function fetchDiscordGif(searchTerm) {
+    try {
+        const url = `https://discord.com/api/v9/gifs/search?q=${encodeURIComponent(searchTerm)}&media_format=gif&provider=tenor&locale=en-US`;
+        
+        const { data } = await axios.get(url, {
+            timeout: 10000,
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                'Accept': 'application/json'
+            }
+        });
+
+        if (!data || data.length === 0) {
+            throw new Error(`Aucun résultat pour la recherche "${searchTerm}"`);
+        }
+
+        // Sélectionner un GIF aléatoire
+        const randomGif = data[Math.floor(Math.random() * data.length)];
+        const gifUrl = randomGif.src || randomGif.url;
+        
+        if (!gifUrl) {
+            throw new Error('URL du GIF non trouvée dans la réponse');
+        }
+
+        return { url: gifUrl };
+    } catch (error) {
+        console.error(`Erreur fetchDiscordGif pour "${searchTerm}":`, error.message);
+        throw new Error(`Impossible de récupérer un GIF pour "${searchTerm}"`);
+    }
 }
 
 /**
  * Détermine le jid de la personne visée par la réaction :
  * 1. Une mention (@numéro) dans le message
  * 2. Le participant du message cité (reply)
- * 3. Un numéro passé en argument (ex: .gifle 225xxxxxxx)
+ * 3. Un numéro passé en argument
  * Retourne null si aucune cible n'est trouvée.
  */
 function resolveTarget(msg, args) {
@@ -95,24 +95,40 @@ async function handleReaction(socket, msg, sender, isGroup, command, args, nowse
     if (!reaction) return false;
 
     try {
-        // Petit accusé de réception sous forme d'emoji
+        // Accusé de réception
         await socket.sendMessage(sender, { react: { text: '💫', key: msg.key } }).catch(() => {});
 
-        const gif = await fetchNekoGif(reaction.endpoint);
-        const target = resolveTarget(msg, args);
-        const authorTag = `@${(nowsender || sender).split('@')[0]}`;
-
-        let caption;
-        let mentions = [nowsender].filter(Boolean);
+        // Récupérer le GIF
+        const gif = await fetchDiscordGif(reaction.search);
+        
+        // === MODIFICATION PRINCIPALE ===
+        // 1. Essayer de trouver une cible (mention, reply, argument)
+        let target = resolveTarget(msg, args);
+        let caption = '';
+        let mentions = [];
 
         if (target) {
+            // Si une cible est trouvée, on l'envoie à cette personne
+            const authorTag = `@${(nowsender || sender).split('@')[0]}`;
             const targetTag = `@${target.split('@')[0]}`;
             caption = `${authorTag} ${reaction.verb} ${targetTag} !`;
-            mentions.push(target);
+            mentions = [nowsender, target].filter(Boolean);
         } else {
-            caption = `${authorTag} ${reaction.verb} tout le monde ! 😄`;
+            // ✅ SI AUCUNE CIBLE : envoi aléatoire "à tout le monde" ou en message privé
+            if (isGroup) {
+                // Dans un groupe : message général
+                const authorTag = `@${(nowsender || sender).split('@')[0]}`;
+                caption = `${authorTag} ${reaction.verb} tout le monde ! 😄`;
+                mentions = [nowsender].filter(Boolean);
+            } else {
+                // En privé : message simple sans mention
+                caption = `💫 ${reaction.verb} en GIF !`;
+                mentions = [];
+            }
         }
+        // ==============================
 
+        // Envoyer le GIF avec la légende appropriée
         await socket.sendMessage(sender, {
             video: { url: gif.url },
             gifPlayback: true,
@@ -130,5 +146,4 @@ async function handleReaction(socket, msg, sender, isGroup, command, args, nowse
     }
 }
 
-module.exports = { REACTIONS, handleReaction, fetchNekoGif };
-  
+module.exports = { REACTIONS, handleReaction, fetchDiscordGif };
