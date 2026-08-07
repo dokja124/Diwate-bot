@@ -128,14 +128,17 @@ async function handleReaction(socket, msg, sender, isGroup, command, args, nowse
         }
         // ==============================
 
-        // Envoyer le GIF avec la légende appropriée
-        await socket.sendMessage(sender, {
-            video: { url: gif.url },
-            gifPlayback: true,
-            caption,
-            mentions
-        }, { quoted: msg });
+        // ✅ Méthode fiable pour envoyer un GIF en tant que vidéo
+const gifBuffer = await axios.get(gif.url, { responseType: 'arraybuffer' })
+    .then(res => Buffer.from(res.data));
 
+await socket.sendMessage(sender, {
+    video: gifBuffer,
+    gifPlayback: true,
+    caption,
+    mentions
+}, { quoted: msg });
+        
         return true;
     } catch (error) {
         console.error(`Erreur commande de réaction "${command}":`, error.message);
