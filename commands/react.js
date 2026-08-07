@@ -1,66 +1,80 @@
 const axios = require('axios');
-const { generateWAMessage, proto } = require('@whiskeysockets/baileys');
+const { generateWAMessage, proto, downloadContentFromMessage } = require('@whiskeysockets/baileys');
+
+// =============================================
+// 1. CONFIGURATION GIPHY
+// =============================================
+const GIPHY_API_KEY = 'iYRaPBSF9m5Dzbpwofz7UNrwFW2E2sNn'; // Ta clé API
 
 // Commande (en français) -> { search term, verbe utilisé dans le texte }
 const REACTIONS = {
-    gifle:    { search: 'slap anime',    verb: 'gifle' },
-    tape:     { search: 'punch anime',   verb: 'frappe' },
-    boum:     { search: 'kick anime',    verb: 'donne un coup de pied à' },
-    tue:      { search: 'shoot anime',   verb: 'tire sur' },
-    calin:    { search: 'hug anime',     verb: 'fait un câlin à' },
-    blottis:  { search: 'cuddle anime',  verb: 'se blottit contre' },
-    bisou:    { search: 'kiss anime',    verb: 'embrasse' },
-    embrasse: { search: 'kiss anime',    verb: 'embrasse' },
-    caresse:  { search: 'pat anime',     verb: 'caresse' },
-    titille:  { search: 'tickle anime',  verb: 'chatouille' },
-    mordre:   { search: 'bite anime',    verb: 'mord' },
-    envoie:   { search: 'yeet anime',    verb: 'envoie valser' },
-    danse:    { search: 'dance anime',   verb: 'danse avec' },
-    clin:     { search: 'wink anime',    verb: 'fait un clin d\'œil à' },
-    sourire:  { search: 'smile anime',   verb: 'sourit à' },
-    coucou:   { search: 'wave anime',    verb: 'salue' },
-    triste:   { search: 'cry anime',     verb: 'pleure devant' },
-    dodo:     { search: 'sleep anime',   verb: 's\'endort avec' },
-    content:  { search: 'happy anime',   verb: 'est content(e) avec' },
+    gifle:    { search: 'slap',     verb: 'gifle' },
+    tape:     { search: 'punch',    verb: 'frappe' },
+    boum:     { search: 'kick',     verb: 'donne un coup de pied à' },
+    tue:      { search: 'shoot',    verb: 'tire sur' },
+    calin:    { search: 'hug',      verb: 'fait un câlin à' },
+    blottis:  { search: 'cuddle',   verb: 'se blottit contre' },
+    bisou:    { search: 'kiss',     verb: 'embrasse' },
+    embrasse: { search: 'kiss',     verb: 'embrasse' },
+    caresse:  { search: 'pat',      verb: 'caresse' },
+    titille:  { search: 'tickle',   verb: 'chatouille' },
+    mordre:   { search: 'bite',     verb: 'mord' },
+    envoie:   { search: 'yeet',     verb: 'envoie valser' },
+    danse:    { search: 'dance',    verb: 'danse avec' },
+    clin:     { search: 'wink',     verb: 'fait un clin d\'œil à' },
+    sourire:  { search: 'smile',    verb: 'sourit à' },
+    coucou:   { search: 'wave',     verb: 'salue' },
+    triste:   { search: 'cry',      verb: 'pleure devant' },
+    dodo:     { search: 'sleep',    verb: 's\'endort avec' },
+    content:  { search: 'happy',    verb: 'est content(e) avec' },
 };
 
+// =============================================
+// 2. RÉCUPÉRATION DES GIFS DEPUIS GIPHY
+// =============================================
 /**
- * Récupère un gif aléatoire depuis l'API interne de Discord (Tenor)
- * pour un terme de recherche donné.
+ * Récupère un gif aléatoire depuis GIPHY
  */
-async function fetchDiscordGif(searchTerm) {
+async function fetchGiphyGif(searchTerm) {
     try {
-        const url = `https://discord.com/api/v9/gifs/search?q=${encodeURIComponent(searchTerm)}&media_format=gif&provider=tenor&locale=en-US`;
-        
-        const { data } = await axios.get(url, {
-            timeout: 10000,
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                'Accept': 'application/json'
-            }
-        });
+        // Ajouter "anime" pour avoir plus de résultats animés
+        const query = `${searchTerm} anime`;
+        const limit = 20;
+        const url = `https://api.giphy.com/v1/gifs/search?api_key=${GIPHY_API_KEY}&q=${encodeURIComponent(query)}&limit=${limit}&rating=g`;
 
-        if (!data || data.length === 0) {
-            throw new Error(`Aucun résultat pour la recherche "${searchTerm}"`);
+        const response = await axios.get(url, { timeout: 10000 });
+        const gifs = response.data.data;
+
+        if (!gifs || gifs.length === 0) {
+            throw new Error(`Aucun GIF GIPHY trouvé pour "${searchTerm}"`);
         }
 
         // Sélectionner un GIF aléatoire
-        const randomGif = data[Math.floor(Math.random() * data.length)];
-        const gifUrl = randomGif.src || randomGif.url;
+        const randomGif = gifs[Math.floor(Math.random() * gifs.length)];
+        
+        // GIPHY fournit le GIF en MP4 (parfait pour WhatsApp)
+        const gifUrl = randomGif.images.original.mp4 || randomGif.images.downsized.mp4;
         
         if (!gifUrl) {
-            throw new Error('URL du GIF non trouvée dans la réponse');
+            throw new Error('URL du GIF GIPHY non trouvée');
         }
 
-        return { url: gifUrl };
+        return { 
+            url: gifUrl,
+            title: randomGif.title || searchTerm,
+            username: randomGif.username || 'GIPHY'
+        };
     } catch (error) {
-        console.error(`Erreur fetchDiscordGif pour "${searchTerm}":`, error.message);
-        throw new Error(`Impossible de récupérer un GIF pour "${searchTerm}"`);
+        console.error(`Erreur fetchGiphyGif:`, error.message);
+        throw new Error(`Impossible de récupérer un GIF GIPHY pour "${searchTerm}"`);
     }
 }
 
+// =============================================
+// 3. TÉLÉCHARGEMENT DU GIF
+// =============================================
 /**
- * Télécharge un GIF depuis une URL et retourne un buffer
+ * Télécharge un GIF depuis une URL
  */
 async function downloadGif(url) {
     try {
@@ -78,27 +92,18 @@ async function downloadGif(url) {
             throw new Error('Le fichier téléchargé est vide');
         }
 
-        // Vérifier que c'est bien un GIF (magic number: GIF87a ou GIF89a)
-        const isGif = buffer.length > 6 && 
-            buffer[0] === 0x47 && buffer[1] === 0x49 && buffer[2] === 0x46;
-        
-        if (!isGif) {
-            console.warn('⚠️ Le fichier téléchargé n\'est pas un GIF valide, tentative quand même...');
-        }
-
         return buffer;
     } catch (error) {
-        console.error('Erreur lors du téléchargement du GIF:', error.message);
+        console.error('Erreur téléchargement GIF:', error.message);
         throw new Error('Impossible de télécharger le GIF');
     }
 }
 
+// =============================================
+// 4. DÉTERMINER LA CIBLE
+// =============================================
 /**
- * Détermine le jid de la personne visée par la réaction :
- * 1. Une mention (@numéro) dans le message
- * 2. Le participant du message cité (reply)
- * 3. Un numéro passé en argument
- * Retourne null si aucune cible n'est trouvée.
+ * Détermine le jid de la personne visée par la réaction
  */
 function resolveTarget(msg, args) {
     const mentioned = msg.message?.extendedTextMessage?.contextInfo?.mentionedJid;
@@ -115,15 +120,11 @@ function resolveTarget(msg, args) {
     return null;
 }
 
+// =============================================
+// 5. ENVOI DE LA RÉACTION
+// =============================================
 /**
- * Gère l'envoi d'une commande de réaction.
- * @param {object} socket - le socket Baileys
- * @param {object} msg - le message reçu
- * @param {string} sender - le jid où répondre (groupe ou privé)
- * @param {boolean} isGroup - si le message vient d'un groupe
- * @param {string} command - la commande utilisée (ex: 'gifle')
- * @param {string[]} args - les arguments de la commande
- * @param {string} nowsender - le jid réel de l'auteur du message
+ * Gère l'envoi d'une commande de réaction (avec upload sur WhatsApp)
  */
 async function handleReaction(socket, msg, sender, isGroup, command, args, nowsender) {
     const reaction = REACTIONS[command];
@@ -133,13 +134,13 @@ async function handleReaction(socket, msg, sender, isGroup, command, args, nowse
         // Accusé de réception
         await socket.sendMessage(sender, { react: { text: '💫', key: msg.key } }).catch(() => {});
 
-        // Récupérer le GIF
-        const gif = await fetchDiscordGif(reaction.search);
+        // 1. Récupérer l'URL du GIF depuis GIPHY
+        const gif = await fetchGiphyGif(reaction.search);
         
-        // Télécharger le GIF en buffer
+        // 2. Télécharger le GIF en buffer
         const gifBuffer = await downloadGif(gif.url);
 
-        // Trouver la cible
+        // 3. Construire la légende
         let target = resolveTarget(msg, args);
         let caption = '';
         let mentions = [];
@@ -161,47 +162,66 @@ async function handleReaction(socket, msg, sender, isGroup, command, args, nowse
         }
 
         // =============================================
-        // ✅ MÉTHODE FIABLE AVEC UPLOAD
+        // 6. ENVOI AVEC UPLOAD SUR WHATSAPP
         // =============================================
 
-        // 1. Construire le message avec generateWAMessage
-        const waMessage = await generateWAMessage(
-            sender,
-            {
-                video: gifBuffer,
+        try {
+            // Méthode 1 : generateWAMessage (la plus fiable)
+            const waMessage = await generateWAMessage(
+                sender,
+                {
+                    video: gifBuffer,
+                    gifPlayback: true,
+                    caption: caption,
+                    mentions: mentions
+                },
+                {
+                    quoted: msg,
+                    userJid: socket.user.id,
+                    upload: socket.waUploadToServer
+                }
+            );
+
+            await socket.relayMessage(sender, waMessage.message, {
+                messageId: waMessage.key.id
+            });
+
+            console.log(`✅ GIF GIPHY envoyé pour "${command}"`);
+            
+        } catch (uploadError) {
+            // Fallback : méthode avec prepareMessageMedia
+            console.warn('Fallback vers prepareMessageMedia:', uploadError.message);
+            
+            const media = await socket.prepareMessageMedia(
+                { video: gifBuffer, gifPlayback: true, caption, mentions },
+                { mediaType: 'video', upload: true }
+            );
+            
+            await socket.sendMessage(sender, {
+                video: media,
                 gifPlayback: true,
-                caption: caption,
-                mentions: mentions
-            },
-            {
-                quoted: msg,
-                userJid: socket.user.id,
-                upload: socket.waUploadToServer // ← Upload sur les serveurs WhatsApp
-            }
-        );
-
-        // 2. Envoyer le message
-        await socket.relayMessage(sender, waMessage.message, { 
-            messageId: waMessage.key.id 
-        });
-
-        console.log(`✅ GIF envoyé pour la commande "${command}" (${gif.url})`);
+                caption,
+                mentions
+            }, { quoted: msg });
+        }
 
         return true;
     } catch (error) {
-        console.error(`Erreur commande de réaction "${command}":`, error.message);
+        console.error(`Erreur commande "${command}":`, error.message);
         
-        // Fallback : essayer avec la méthode simple si generateWAMessage échoue
         try {
             await socket.sendMessage(sender, {
-                text: `❌ *Erreur lors de l'envoi du GIF.*\nRéessaye plus tard.`
-            }, { quoted: msg }).catch(() => {});
-        } catch (fallbackError) {
-            console.error('Fallback également échoué:', fallbackError.message);
+                text: `❌ *Impossible d'envoyer le GIF pour "${command}".*\nErreur : ${error.message}`
+            }, { quoted: msg });
+        } catch (e) {
+            console.error('Erreur fallback:', e.message);
         }
         
         return true;
     }
 }
 
-module.exports = { REACTIONS, handleReaction, fetchDiscordGif };
+// =============================================
+// 7. EXPORTS
+// =============================================
+module.exports = { REACTIONS, handleReaction, fetchGiphyGif };
