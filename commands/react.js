@@ -1,4 +1,5 @@
 const axios = require('axios');
+const { generateWAMessage, proto } = require('@whiskeysockets/baileys');
 
 // Commande (en français) -> { search term, verbe utilisé dans le texte }
 const REACTIONS = {
@@ -45,9 +46,7 @@ async function fetchDiscordGif(searchTerm) {
 
         // Sélectionner un GIF aléatoire
         const randomGif = data[Math.floor(Math.random() * data.length)];
-        
-        // L'URL peut être dans différentes propriétés
-        const gifUrl = randomGif.src || randomGif.url || randomGif.media?.url;
+        const gifUrl = randomGif.src || randomGif.url;
         
         if (!gifUrl) {
             throw new Error('URL du GIF non trouvée dans la réponse');
@@ -61,7 +60,7 @@ async function fetchDiscordGif(searchTerm) {
 }
 
 /**
- * Télécharge un GIF et le convertit en Buffer
+ * Télécharge un GIF depuis une URL et retourne un buffer
  */
 async function downloadGif(url) {
     try {
@@ -75,7 +74,6 @@ async function downloadGif(url) {
 
         const buffer = Buffer.from(response.data);
         
-        // Vérifier que le buffer n'est pas vide
         if (!buffer || buffer.length === 0) {
             throw new Error('Le fichier téléchargé est vide');
         }
@@ -85,7 +83,7 @@ async function downloadGif(url) {
             buffer[0] === 0x47 && buffer[1] === 0x49 && buffer[2] === 0x46;
         
         if (!isGif) {
-            console.warn('⚠️ Le fichier téléchargé n\'est pas un GIF valide');
+            console.warn('⚠️ Le fichier téléchargé n\'est pas un GIF valide, tentative quand même...');
         }
 
         return buffer;
@@ -96,7 +94,11 @@ async function downloadGif(url) {
 }
 
 /**
- * Détermine le jid de la personne visée par la réaction
+ * Détermine le jid de la personne visée par la réaction :
+ * 1. Une mention (@numéro) dans le message
+ * 2. Le participant du message cité (reply)
+ * 3. Un numéro passé en argument
+ * Retourne null si aucune cible n'est trouvée.
  */
 function resolveTarget(msg, args) {
     const mentioned = msg.message?.extendedTextMessage?.contextInfo?.mentionedJid;
@@ -115,6 +117,13 @@ function resolveTarget(msg, args) {
 
 /**
  * Gère l'envoi d'une commande de réaction.
+ * @param {object} socket - le socket Baileys
+ * @param {object} msg - le message reçu
+ * @param {string} sender - le jid où répondre (groupe ou privé)
+ * @param {boolean} isGroup - si le message vient d'un groupe
+ * @param {string} command - la commande utilisée (ex: 'gifle')
+ * @param {string[]} args - les arguments de la commande
+ * @param {string} nowsender - le jid réel de l'auteur du message
  */
 async function handleReaction(socket, msg, sender, isGroup, command, args, nowsender) {
     const reaction = REACTIONS[command];
@@ -124,7 +133,7 @@ async function handleReaction(socket, msg, sender, isGroup, command, args, nowse
         // Accusé de réception
         await socket.sendMessage(sender, { react: { text: '💫', key: msg.key } }).catch(() => {});
 
-        // Récupérer l'URL du GIF
+        // Récupérer le GIF
         const gif = await fetchDiscordGif(reaction.search);
         
         // Télécharger le GIF en buffer
@@ -152,24 +161,45 @@ async function handleReaction(socket, msg, sender, isGroup, command, args, nowse
         }
 
         // =============================================
-        // ✅ ENVOI DU GIF EN TANT QUE VIDÉO
+        // ✅ MÉTHODE FIABLE AVEC UPLOAD
         // =============================================
-        await socket.sendMessage(sender, {
-            video: gifBuffer,
-            gifPlayback: true,
-            caption: caption,
-            mentions: mentions,
-            mimetype: 'video/mp4' // Pour assurer la compatibilité
-        }, { quoted: msg });
 
-        console.log(`✅ GIF envoyé pour la commande "${command}"`);
+        // 1. Construire le message avec generateWAMessage
+        const waMessage = await generateWAMessage(
+            sender,
+            {
+                video: gifBuffer,
+                gifPlayback: true,
+                caption: caption,
+                mentions: mentions
+            },
+            {
+                quoted: msg,
+                userJid: socket.user.id,
+                upload: socket.waUploadToServer // ← Upload sur les serveurs WhatsApp
+            }
+        );
+
+        // 2. Envoyer le message
+        await socket.relayMessage(sender, waMessage.message, { 
+            messageId: waMessage.key.id 
+        });
+
+        console.log(`✅ GIF envoyé pour la commande "${command}" (${gif.url})`);
 
         return true;
     } catch (error) {
         console.error(`Erreur commande de réaction "${command}":`, error.message);
-        await socket.sendMessage(sender, {
-            text: `❌ *Impossible de récupérer le gif pour "${command}" pour le moment.*\nErreur : ${error.message}`
-        }, { quoted: msg }).catch(() => {});
+        
+        // Fallback : essayer avec la méthode simple si generateWAMessage échoue
+        try {
+            await socket.sendMessage(sender, {
+                text: `❌ *Erreur lors de l'envoi du GIF.*\nRéessaye plus tard.`
+            }, { quoted: msg }).catch(() => {});
+        } catch (fallbackError) {
+            console.error('Fallback également échoué:', fallbackError.message);
+        }
+        
         return true;
     }
 }
