@@ -45,13 +45,16 @@ const LANGUES = {
     'ru': { code: 'ru', emoji: '🇷🇺' },
 };
 
-// Correspondance ISO 639-3 (franc) -> ISO 639-1 (MyMemory / nos codes)
+// Correspondance ISO 639-3 (franc) -> ISO 639-1
 const FRANC_VERS_ISO1 = {
     fra: 'fr', eng: 'en', spa: 'es', jpn: 'ja', deu: 'de', ita: 'it',
     por: 'pt', cmn: 'zh', zho: 'zh', kor: 'ko', arb: 'ar', ara: 'ar',
     rus: 'ru', hat: 'ht', nld: 'nl', tur: 'tr', hin: 'hi', ind: 'id',
     vie: 'vi', tha: 'th'
 };
+
+// ⚠️ Remplace par ton propre e-mail (aucune inscription requise, juste un identifiant)
+const EMAIL_MYMEMORY = 'malandaniel250@gmail.com';
 
 // =============================================
 // 2. DÉTECTION DE LA LANGUE SOURCE (locale, sans réseau)
@@ -60,7 +63,7 @@ function detecterLangue(texte) {
     if (!franc) return 'inconnue';
     try {
         const code3 = franc(texte, { minLength: 2 });
-        if (code3 === 'und') return 'inconnue'; // langue indéterminée
+        if (code3 === 'und') return 'inconnue';
         return FRANC_VERS_ISO1[code3] || 'inconnue';
     } catch (error) {
         return 'inconnue';
@@ -68,47 +71,77 @@ function detecterLangue(texte) {
 }
 
 // =============================================
-// 3. FONCTION DE TRADUCTION (API MyMemory)
+// 3. PLUSIEURS FOURNISSEURS DE TRADUCTION (essayés dans l'ordre)
 // =============================================
+
+async function viaMyMemory(texte, source, cible) {
+    const response = await axios.get('https://api.mymemory.translated.net/get', {
+        timeout: 8000,
+        params: { q: texte, langpair: `${source}|${cible}`, de: EMAIL_MYMEMORY },
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }
+    });
+    const data = response.data;
+    if (data.responseStatus && Number(data.responseStatus) >= 400) {
+        throw new Error(`MyMemory: ${data.responseData?.translatedText || data.responseStatus}`);
+    }
+    const texteTraduit = data?.responseData?.translatedText;
+    if (!texteTraduit || texteTraduit.trim() === '') throw new Error('MyMemory: réponse vide');
+    return texteTraduit;
+}
+
+async function viaLibreTranslate(texte, source, cible) {
+    const src = source === 'inconnue' ? 'auto' : source;
+    const response = await axios.post('https://libretranslate.de/translate', {
+        q: texte,
+        source: src,
+        target: cible,
+        format: 'text'
+    }, {
+        timeout: 8000,
+        headers: { 'Content-Type': 'application/json' }
+    });
+    const texteTraduit = response.data?.translatedText;
+    if (!texteTraduit || texteTraduit.trim() === '') throw new Error('LibreTranslate: réponse vide');
+    return texteTraduit;
+}
+
+async function viaLingva(texte, source, cible) {
+    const src = source === 'inconnue' ? 'auto' : source;
+    const url = `https://lingva.ml/api/v1/${src}/${cible}/${encodeURIComponent(texte)}`;
+    const response = await axios.get(url, { timeout: 8000 });
+    const texteTraduit = response.data?.translation;
+    if (!texteTraduit || texteTraduit.trim() === '') throw new Error('Lingva: réponse vide');
+    return texteTraduit;
+}
+
+/**
+ * Essaie chaque fournisseur dans l'ordre jusqu'à ce qu'un fonctionne.
+ * Ne renvoie une erreur que si TOUS ont échoué.
+ */
 async function traduireTexte(texte, langueCible, langueSourceDetectee) {
-    // MyMemory exige un code source explicite (pas de vrai "auto" côté serveur)
     const source = (langueSourceDetectee && langueSourceDetectee !== 'inconnue' && langueSourceDetectee !== langueCible)
         ? langueSourceDetectee
-        : (langueCible === 'en' ? 'fr' : 'en'); // repli raisonnable si détection incertaine
+        : (langueCible === 'en' ? 'fr' : 'en');
 
-    try {
-        const url = `https://api.mymemory.translated.net/get`;
-        const response = await axios.get(url, {
-            timeout: 10000,
-            params: {
-    q: texte,
-    langpair: `${source}|${langueCible}`,
-    de: 'malandaniel250@gmail.com' 
-},
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-            }
-        });
+    const fournisseurs = [
+        { nom: 'MyMemory', fn: viaMyMemory },
+        { nom: 'LibreTranslate', fn: viaLibreTranslate },
+        { nom: 'Lingva', fn: viaLingva },
+    ];
 
-        const data = response.data;
-        const texteTraduit = data?.responseData?.translatedText;
-
-        if (!texteTraduit || texteTraduit.trim() === '') {
-            throw new Error('Traduction vide (réponse MyMemory inattendue: ' + JSON.stringify(data).slice(0, 200) + ')');
+    const erreurs = [];
+    for (const { nom, fn } of fournisseurs) {
+        try {
+            const resultat = await fn(texte, source, langueCible);
+            return resultat;
+        } catch (error) {
+            const status = error.response?.status;
+            erreurs.push(`${nom}${status ? ` (HTTP ${status})` : ''}: ${error.message}`);
+            console.error(`Échec ${nom}:`, error.message);
         }
-
-        // MyMemory renvoie parfois un message d'erreur DANS translatedText avec un status 403 dans le JSON
-        if (data.responseStatus && Number(data.responseStatus) >= 400) {
-            throw new Error(`MyMemory a renvoyé une erreur (${data.responseStatus}): ${texteTraduit}`);
-        }
-
-        return texteTraduit;
-    } catch (error) {
-        const status = error.response?.status;
-        const body = error.response?.data ? JSON.stringify(error.response.data).slice(0, 300) : '';
-        console.error('Erreur traduction:', error.message, status ? `[HTTP ${status}]` : '', body);
-        throw new Error(`Impossible de traduire le texte${status ? ` (HTTP ${status})` : ''}: ${error.message}`);
     }
+
+    throw new Error(`Tous les services de traduction ont échoué.\n${erreurs.join('\n')}`);
 }
 
 // =============================================
@@ -189,7 +222,7 @@ async function handleTraduction(socket, msg, sender, args, prefix, fakevCard, is
 
         await socket.sendMessage(sender, { react: { text: '⏳', key: msg.key } }).catch(() => {});
 
-        const langueSource = detecterLangue(texte); // local, instantané, jamais de rate-limit
+        const langueSource = detecterLangue(texte);
         const texteTraduit = await traduireTexte(texte, langueInfo.code, langueSource);
 
         let sourceNom = langueSource;
@@ -227,4 +260,4 @@ module.exports = {
     traduireTexte,
     detecterLangue
 };
-    
+                                     
