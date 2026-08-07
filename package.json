@@ -30,6 +30,7 @@
     "sharp": "latest",
     "file-type": "16.5.4",
     "qrcode": "latest",
+    "franc-min": "^6.2.0",
     "moment-timezone": "latest",
     "events": "latest"
   },
