@@ -81,9 +81,10 @@ async function traduireTexte(texte, langueCible, langueSourceDetectee) {
         const response = await axios.get(url, {
             timeout: 10000,
             params: {
-                q: texte,
-                langpair: `${source}|${langueCible}`
-            },
+    q: texte,
+    langpair: `${source}|${langueCible}`,
+    de: 'malandaniel250@gmail.com' 
+},
             headers: {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
             }
