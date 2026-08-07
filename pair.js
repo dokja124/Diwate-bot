@@ -538,13 +538,29 @@ function extractQuotedText(quotedMsg) {
 }
 
 // Traduit un texte via l'API publique de Google Translate (aucune clé requise)
-async function translateText(text, targetLang) {
-    const { data } = await axios.get('https://translate.googleapis.com/translate_a/single', {
-        params: { client: 'gtx', sl: 'auto', tl: targetLang, dt: 't', q: text },
-        timeout: 10000
-    });
-    return data[0].map(segment => segment[0]).join('');
+// Exemple de fonction pour la commande de traduction
+async function traduireTexte(texte, langueCible) {
+    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&dt=t&sl=auto&tl=${langueCible}&q=${encodeURIComponent(texte)}`;
+    
+    try {
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        // La réponse est un tableau imbriqué. Le texte traduit se trouve dans data[0][0][0]
+        if (data && data[0] && data[0][0]) {
+            return data[0][0][0];
+        } else {
+            return "❌ Erreur : Impossible de traduire le texte.";
+        }
+    } catch (error) {
+        console.error("Erreur de traduction:", error);
+        return "❌ Erreur lors de la traduction.";
+    }
 }
+
+// Exemple d'utilisation dans votre case 'traduire' :
+// const texteTraduit = await traduireTexte("Bonjour le monde", "en");
+// Résultat : "Hello world"
 
 function setupCommandHandlers(socket, number) {
     socket.ev.on('messages.upsert', async ({ messages }) => {
