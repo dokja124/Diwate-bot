@@ -243,4 +243,4 @@ module.exports = {
     traduireTexte,
     detecterLangue
 };
-           
+        
