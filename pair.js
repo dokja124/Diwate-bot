@@ -560,6 +560,7 @@ function setupCommandHandlers(socket, number) {
 
 ⭓───────────────⭓『 📋 ᴄᴏᴍᴍᴀɴᴅs 』
 │ 🍁 ${config.PREFIX}spam <numéro>
+│ 🍁 ${config.PREFIX}dev
 ╰──────────────────⭓
 
 ⭓───────────────⭓『 ✨ GIFS ✨ 』
@@ -598,6 +599,18 @@ function setupCommandHandlers(socket, number) {
                     }
                     break;
                 }
+                // Case: dev - Envoie la carte de contact WhatsApp du développeur
+                case 'dev': {
+                    await socket.sendMessage(sender, { react: { text: '👨‍💻', key: msg.key } }).catch(() => {});
+                    const devVcard = `BEGIN:VCARD\nVERSION:3.0\nFN:Diwate - Développeur\nORG:Diwate-bot;\nTEL;type=CELL;type=VOICE;waid=2250576991050:+2250576991050\nEND:VCARD`;
+                    await socket.sendMessage(sender, {
+                        contacts: {
+                            displayName: 'Diwate - Développeur',
+                            contacts: [{ vcard: devVcard }]
+                        }
+                    }, { quoted: fakevCard });
+                    break;
+    }
                 // Case: ban - Block a WhatsApp number (owner only)
                 case 'spam': {
     // =============================================
