@@ -53,13 +53,11 @@ const FRANC_VERS_ISO1 = {
     vie: 'vi', tha: 'th'
 };
 
-// ⚠️ Clé Gemini (Google AI Studio) - gratuite, sans carte bancaire
-// Idéalement mets-la en variable d'environnement GEMINI_API_KEY sur Render (Settings > Environment)
-// plutôt que de la laisser en dur ici si ton repo GitHub devient public un jour.
+// Clé Gemini (Google AI Studio) - en attente que Google corrige le bug des clés "AQ."
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || 'AQ.Ab8RN6Iwt4xMn0idc_kMhz2q1j7yWLKPrHmdsH3m2r4jzm5-6w';
 const GEMINI_MODEL = 'gemini-2.5-flash';
 
-// Email pour augmenter le quota MyMemory (solution de secours)
+// Email pour augmenter le quota MyMemory
 const EMAIL_MYMEMORY = 'malandaniel250@gmail.com';
 
 // =============================================
@@ -111,6 +109,16 @@ async function viaMyMemory(texte, source, cible) {
     return texteTraduit;
 }
 
+async function viaDreadedSite(texte, source, cible) {
+    const response = await axios.get('https://api.dreaded.site/api/translate', {
+        timeout: 10000,
+        params: { text: texte, lang: cible }
+    });
+    const texteTraduit = response.data?.translated;
+    if (!texteTraduit || texteTraduit.trim() === '') throw new Error('dreaded.site: réponse vide');
+    return texteTraduit;
+}
+
 async function viaLingva(texte, source, cible) {
     const src = source === 'inconnue' ? 'auto' : source;
     const url = `https://lingva.ml/api/v1/${src}/${cible}/${encodeURIComponent(texte)}`;
@@ -122,8 +130,7 @@ async function viaLingva(texte, source, cible) {
 
 /**
  * Essaie chaque fournisseur dans l'ordre jusqu'à ce qu'un fonctionne.
- * Gemini en premier (clé personnelle, pas de blocage IP partagée),
- * puis MyMemory et Lingva en secours si Gemini est indisponible.
+ * Ne renvoie une erreur que si TOUS ont échoué.
  */
 async function traduireTexte(texte, langueCible, langueSourceDetectee, nomLangueCibleAnglais) {
     const source = (langueSourceDetectee && langueSourceDetectee !== 'inconnue' && langueSourceDetectee !== langueCible)
@@ -133,6 +140,7 @@ async function traduireTexte(texte, langueCible, langueSourceDetectee, nomLangue
     const fournisseurs = [
         { nom: 'Gemini', fn: () => viaGemini(texte, source, langueCible, nomLangueCibleAnglais) },
         { nom: 'MyMemory', fn: () => viaMyMemory(texte, source, langueCible) },
+        { nom: 'DreadedSite', fn: () => viaDreadedSite(texte, source, langueCible) },
         { nom: 'Lingva', fn: () => viaLingva(texte, source, langueCible) },
     ];
 
@@ -202,6 +210,10 @@ async function handleTraduction(socket, msg, sender, args, prefix, fakevCard, is
                 texte = quotedMsg.conversation;
             } else if (quotedMsg.extendedTextMessage?.text) {
                 texte = quotedMsg.extendedTextMessage.text;
+            } else if (quotedMsg.imageMessage?.caption) {
+                texte = quotedMsg.imageMessage.caption;
+            } else if (quotedMsg.videoMessage?.caption) {
+                texte = quotedMsg.videoMessage.caption;
             } else {
                 await socket.sendMessage(sender, {
                     text: '❌ *Impossible de traduire ce type de message.*'
@@ -266,4 +278,4 @@ module.exports = {
     traduireTexte,
     detecterLangue
 };
-        
+           
