@@ -529,6 +529,11 @@ function setupCommandHandlers(socket, number) {
     await handleReaction(socket, msg, sender, isGroup, command, args, nowsender);
     return;
                 }
+
+        if (LANGUES[command]) {
+    await handleTraduction(socket, msg, sender, isGroup, command, args, nowsender);
+    return;
+        }
         
         // Define fakevCard for quoting messages
         const fakevCard = {
