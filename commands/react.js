@@ -45,7 +45,9 @@ async function fetchDiscordGif(searchTerm) {
 
         // Sélectionner un GIF aléatoire
         const randomGif = data[Math.floor(Math.random() * data.length)];
-        const gifUrl = randomGif.src || randomGif.url;
+        
+        // L'URL peut être dans différentes propriétés
+        const gifUrl = randomGif.src || randomGif.url || randomGif.media?.url;
         
         if (!gifUrl) {
             throw new Error('URL du GIF non trouvée dans la réponse');
@@ -59,11 +61,42 @@ async function fetchDiscordGif(searchTerm) {
 }
 
 /**
- * Détermine le jid de la personne visée par la réaction :
- * 1. Une mention (@numéro) dans le message
- * 2. Le participant du message cité (reply)
- * 3. Un numéro passé en argument
- * Retourne null si aucune cible n'est trouvée.
+ * Télécharge un GIF et le convertit en Buffer
+ */
+async function downloadGif(url) {
+    try {
+        const response = await axios.get(url, {
+            responseType: 'arraybuffer',
+            timeout: 15000,
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            }
+        });
+
+        const buffer = Buffer.from(response.data);
+        
+        // Vérifier que le buffer n'est pas vide
+        if (!buffer || buffer.length === 0) {
+            throw new Error('Le fichier téléchargé est vide');
+        }
+
+        // Vérifier que c'est bien un GIF (magic number: GIF87a ou GIF89a)
+        const isGif = buffer.length > 6 && 
+            buffer[0] === 0x47 && buffer[1] === 0x49 && buffer[2] === 0x46;
+        
+        if (!isGif) {
+            console.warn('⚠️ Le fichier téléchargé n\'est pas un GIF valide');
+        }
+
+        return buffer;
+    } catch (error) {
+        console.error('Erreur lors du téléchargement du GIF:', error.message);
+        throw new Error('Impossible de télécharger le GIF');
+    }
+}
+
+/**
+ * Détermine le jid de la personne visée par la réaction
  */
 function resolveTarget(msg, args) {
     const mentioned = msg.message?.extendedTextMessage?.contextInfo?.mentionedJid;
@@ -82,13 +115,6 @@ function resolveTarget(msg, args) {
 
 /**
  * Gère l'envoi d'une commande de réaction.
- * @param {object} socket - le socket Baileys
- * @param {object} msg - le message reçu
- * @param {string} sender - le jid où répondre (groupe ou privé)
- * @param {boolean} isGroup - si le message vient d'un groupe
- * @param {string} command - la commande utilisée (ex: 'gifle')
- * @param {string[]} args - les arguments de la commande
- * @param {string} nowsender - le jid réel de l'auteur du message
  */
 async function handleReaction(socket, msg, sender, isGroup, command, args, nowsender) {
     const reaction = REACTIONS[command];
@@ -98,47 +124,46 @@ async function handleReaction(socket, msg, sender, isGroup, command, args, nowse
         // Accusé de réception
         await socket.sendMessage(sender, { react: { text: '💫', key: msg.key } }).catch(() => {});
 
-        // Récupérer le GIF
+        // Récupérer l'URL du GIF
         const gif = await fetchDiscordGif(reaction.search);
         
-        // === MODIFICATION PRINCIPALE ===
-        // 1. Essayer de trouver une cible (mention, reply, argument)
+        // Télécharger le GIF en buffer
+        const gifBuffer = await downloadGif(gif.url);
+
+        // Trouver la cible
         let target = resolveTarget(msg, args);
         let caption = '';
         let mentions = [];
 
         if (target) {
-            // Si une cible est trouvée, on l'envoie à cette personne
             const authorTag = `@${(nowsender || sender).split('@')[0]}`;
             const targetTag = `@${target.split('@')[0]}`;
-            caption = `${authorTag} ${reaction.verb} ${targetTag} !`;
+            caption = `${authorTag} ${reaction.verb} ${targetTag} ! ❤️`;
             mentions = [nowsender, target].filter(Boolean);
         } else {
-            // ✅ SI AUCUNE CIBLE : envoi aléatoire "à tout le monde" ou en message privé
             if (isGroup) {
-                // Dans un groupe : message général
                 const authorTag = `@${(nowsender || sender).split('@')[0]}`;
                 caption = `${authorTag} ${reaction.verb} tout le monde ! 😄`;
                 mentions = [nowsender].filter(Boolean);
             } else {
-                // En privé : message simple sans mention
                 caption = `💫 ${reaction.verb} en GIF !`;
                 mentions = [];
             }
         }
-        // ==============================
 
-        // ✅ Méthode fiable pour envoyer un GIF en tant que vidéo
-const gifBuffer = await axios.get(gif.url, { responseType: 'arraybuffer' })
-    .then(res => Buffer.from(res.data));
+        // =============================================
+        // ✅ ENVOI DU GIF EN TANT QUE VIDÉO
+        // =============================================
+        await socket.sendMessage(sender, {
+            video: gifBuffer,
+            gifPlayback: true,
+            caption: caption,
+            mentions: mentions,
+            mimetype: 'video/mp4' // Pour assurer la compatibilité
+        }, { quoted: msg });
 
-await socket.sendMessage(sender, {
-    video: gifBuffer,
-    gifPlayback: true,
-    caption,
-    mentions
-}, { quoted: msg });
-        
+        console.log(`✅ GIF envoyé pour la commande "${command}"`);
+
         return true;
     } catch (error) {
         console.error(`Erreur commande de réaction "${command}":`, error.message);
