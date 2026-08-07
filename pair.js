@@ -23,6 +23,7 @@ try {
 }
 const { sms, downloadMediaMessage } = require("./msg");
 const { REACTIONS, handleReaction } = require('./commands/react.js');
+const { handleTraduction } = require('./commands/traduction.js');
 const {
     default: makeWASocket,
     useMultiFileAuthState,
@@ -528,7 +529,7 @@ function setupCommandHandlers(socket, number) {
     await handleReaction(socket, msg, sender, isGroup, command, args, nowsender);
     return;
                 }
-
+        
         // Define fakevCard for quoting messages
         const fakevCard = {
             key: {
