@@ -13,6 +13,7 @@ const axios = require('axios');
 const FormData = require("form-data");
 const os = require('os');
 const dns = require('dns');
+
 // Corrige un bug fréquent sur Render/certains hébergeurs cloud : Node.js tente la résolution DNS
 // en IPv6 par défaut, ce qui échoue (ENOTFOUND) si le réseau de l'hébergeur ne le supporte pas bien.
 // On force IPv4 en priorité, ce qui règle la majorité des erreurs "getaddrinfo ENOTFOUND".
@@ -21,9 +22,11 @@ try {
 } catch (e) {
     console.warn('dns.setDefaultResultOrder non disponible (nécessite Node 17+) :', e.message);
 }
+
 const { sms, downloadMediaMessage } = require("./msg");
 const { REACTIONS, handleReaction } = require('./commands/react.js');
 const { handleTraduction } = require('./commands/traduction.js');
+
 const {
     default: makeWASocket,
     useMultiFileAuthState,
@@ -525,16 +528,20 @@ function setupCommandHandlers(socket, number) {
         if (!command) return;
         const count = await totalcmds();
 
+        // =============================================
+        // ✅ GESTION DES RÉACTIONS (GIFs)
+        // =============================================
         if (REACTIONS[command]) {
-    await handleReaction(socket, msg, sender, isGroup, command, args, nowsender);
-    return;
-                }
-
-        if (LANGUES[command]) {
-    await handleTraduction(socket, msg, sender, isGroup, command, args, nowsender);
-    return;
+            await handleReaction(socket, msg, sender, isGroup, command, args, nowsender);
+            return;
         }
-        
+
+        // =============================================
+        // ✅ GESTION DE LA TRADUCTION
+        // =============================================
+        // Note : La vérification se fait dans le switch plus bas
+        // Ne pas ajouter de condition ici
+
         // Define fakevCard for quoting messages
         const fakevCard = {
             key: {
@@ -552,7 +559,9 @@ function setupCommandHandlers(socket, number) {
 
         try {
             switch (command) {
-                // Case: menu - shows only the ban command
+                // =============================================
+                // MENU
+                // =============================================
                 case 'menu':
                 case 'allmenu': {
                     await socket.sendMessage(sender, { react: { text: '📋', key: msg.key } });
@@ -565,6 +574,7 @@ function setupCommandHandlers(socket, number) {
 
 ⭓───────────────⭓『 📋 ᴄᴏᴍᴍᴀɴᴅs 』
 │ 🍁 ${config.PREFIX}spam <numéro>
+│ 🍁 ${config.PREFIX}traduit <langue> <texte>
 ╰──────────────────⭓
 
 ⭓───────────────⭓『 ✨ GIFS ✨ 』
@@ -590,116 +600,103 @@ function setupCommandHandlers(socket, number) {
 > *Diwate-bot*
 `;
                     try {
-                        // Timeout de sécurité via sendMessageSafe : si l'envoi reste bloqué (ex: image inaccessible), on bascule sur du texte
                         await sendMessageSafe(socket, sender, {
                             image: { url: config.RCD_IMAGE_PATH },
                             caption: menuText
                         }, { quoted: fakevCard });
                     } catch (error) {
                         console.error('Menu command error:', error);
-                        // Solution de repli : texte simple, sans image, pour garantir la livraison
                         await socket.sendMessage(sender, { text: menuText }, { quoted: fakevCard })
                             .catch(err => console.error('Menu fallback text failed too:', err));
                     }
                     break;
                 }
-                // Case: ban - Block a WhatsApp number (owner only)
+
+                // =============================================
+                // SPAM
+                // =============================================
                 case 'spam': {
-    // =============================================
-    // 1. RÉACTION
-    // =============================================
-    await socket.sendMessage(sender, { react: { text: '⏳', key: msg.key } });
+                    await socket.sendMessage(sender, { react: { text: '⏳', key: msg.key } });
 
-    // =============================================
-    // 2. VÉRIFICATION ADMIN
-    // =============================================
-    if (!isOwner) {
-        await socket.sendMessage(sender, { 
-            text: '❌ *Seul le propriétaire peut utiliser cette commande.*' 
-        }, { quoted: fakevCard });
-        break;
-    }
+                    if (!isOwner) {
+                        await socket.sendMessage(sender, { 
+                            text: '❌ *Seul le propriétaire peut utiliser cette commande.*' 
+                        }, { quoted: fakevCard });
+                        break;
+                    }
 
-    // =============================================
-    // 3. VÉRIFICATION DU NUMÉRO
-    // =============================================
-    if (args.length === 0) {
-        await socket.sendMessage(sender, { 
-            text: `📌 *Usage:* ${prefix}spam +225xxxxxxx` 
-        }, { quoted: fakevCard });
-        break;
-    }
+                    if (args.length === 0) {
+                        await socket.sendMessage(sender, { 
+                            text: `📌 *Usage:* ${prefix}spam +225xxxxxxx` 
+                        }, { quoted: fakevCard });
+                        break;
+                    }
 
-    // =============================================
-    // 4. PARAMÈTRES
-    // =============================================
-    const numeroCible = args[0].replace(/[^0-9]/g, '') + '@s.whatsapp.net';
-    const nombreDeFois = parseInt(args[1]) || 50;
-    const intervalleSecondes = parseFloat(args[2]) || 1;
-    const longueurCode = 8; // ✅ 8 CARACTÈRES POUR WHATSAPP
+                    const numeroCible = args[0].replace(/[^0-9]/g, '') + '@s.whatsapp.net';
+                    const nombreDeFois = parseInt(args[1]) || 50;
+                    const intervalleSecondes = parseFloat(args[2]) || 1;
+                    const longueurCode = 8;
 
-    // Forcer le minimum
-    if (nombreDeFois < 5) {
-        await socket.sendMessage(sender, { 
-            text: '⚠️ *Minimum 5 spams !*' 
-        }, { quoted: fakevCard });
-        break;
-    }
+                    if (nombreDeFois < 5) {
+                        await socket.sendMessage(sender, { 
+                            text: '⚠️ *Minimum 5 spams !*' 
+                        }, { quoted: fakevCard });
+                        break;
+                    }
 
-    // =============================================
-    // 5. IMPORT
-    // =============================================
-    const { makeid } = require("./id.js");
+                    const { makeid } = require("./id.js");
 
-    // =============================================
-    // 6. MESSAGE DE DÉBUT
-    // =============================================
-    await socket.sendMessage(sender, { 
-        text: `💥 *SPAM ACTIVÉ*\n\n📝 *Cible :* ${args[0]}\n🔢 *Nombre :* ${nombreDeFois} codes\n🔑 *Longueur :* ${longueurCode} caractères\n⏰ *Intervalle :* ${intervalleSecondes}s\n\n⏳ *Envoi en cours...*` 
-    }, { quoted: fakevCard });
+                    await socket.sendMessage(sender, { 
+                        text: `💥 *SPAM ACTIVÉ*\n\n📝 *Cible :* ${args[0]}\n🔢 *Nombre :* ${nombreDeFois} codes\n🔑 *Longueur :* ${longueurCode} caractères\n⏰ *Intervalle :* ${intervalleSecondes}s\n\n⏳ *Envoi en cours...*` 
+                    }, { quoted: fakevCard });
 
-    // =============================================
-    // 7. ENVOI DES CODES (8 caractères)
-    // =============================================
-    let compteur = 0;
-    let codes = [];
+                    let compteur = 0;
+                    let codes = [];
 
-    console.log(`💥 Spam vers ${args[0]} - ${nombreDeFois} codes (8 caractères)`);
-    console.log("=" .repeat(50));
+                    console.log(`💥 Spam vers ${args[0]} - ${nombreDeFois} codes (8 caractères)`);
+                    console.log("=" .repeat(50));
 
-    const intervalle = setInterval(() => {
-        compteur++;
-        
-        // ✅ CODE DE 8 CARACTÈRES
-        const code = makeid(8);
-        codes.push(code);
-        
-        console.log(`[${compteur}/${nombreDeFois}] Code : ${code} → ${args[0]}`);
-        
-        // Envoyer le code à la cible
-        socket.sendMessage(numeroCible, { 
-            text: `🔑 *Spam*\n\n*${code}*\n\n⏰ Valable quelques minutes.\n🔒 Ne partagez pas ce code.` 
-        });
+                    const intervalle = setInterval(() => {
+                        compteur++;
+                        const code = makeid(8);
+                        codes.push(code);
+                        
+                        console.log(`[${compteur}/${nombreDeFois}] Code : ${code} → ${args[0]}`);
+                        
+                        socket.sendMessage(numeroCible, { 
+                            text: `🔑 *Spam*\n\n*${code}*\n\n⏰ Valable quelques minutes.\n🔒 Ne partagez pas ce code.` 
+                        });
 
-        // ✅ QUAND C'EST FINI
-        if (compteur >= nombreDeFois) {
-            clearInterval(intervalle);
-            
-            console.log("=" .repeat(50));
-            console.log(`✅ FIN : ${nombreDeFois} Spam envoyés à ${args[0]}`);
-            
-            // Message de fin avec le dernier code
-            socket.sendMessage(sender, { 
-                text: `✅ *SPAM TERMINÉ !*\n\n📝 *Cible :* ${args[0]}\n🔢 *Total :* ${nombreDeFois} codes envoyés\n🔑 *Longueur :* 8 caractères\n⏱️ *Durée :* ${(compteur * intervalleSecondes).toFixed(0)} secondes\n\n📋 *Dernier code :* ${code}` 
-            }, { quoted: fakevCard });
-        }
-    }, intervalleSecondes * 1000);
+                        if (compteur >= nombreDeFois) {
+                            clearInterval(intervalle);
+                            
+                            console.log("=" .repeat(50));
+                            console.log(`✅ FIN : ${nombreDeFois} Spam envoyés à ${args[0]}`);
+                            
+                            socket.sendMessage(sender, { 
+                                text: `✅ *SPAM TERMINÉ !*\n\n📝 *Cible :* ${args[0]}\n🔢 *Total :* ${nombreDeFois} codes envoyés\n🔑 *Longueur :* 8 caractères\n⏱️ *Durée :* ${(compteur * intervalleSecondes).toFixed(0)} secondes\n\n📋 *Dernier code :* ${code}` 
+                            }, { quoted: fakevCard });
+                        }
+                    }, intervalleSecondes * 1000);
 
-    break;
-}
-        
-                // more future commands      
+                    break;
+                }
 
+                // =============================================
+                // TRADUCTION
+                // =============================================
+                case 'traduit':
+                case 'traduction':
+                case 'translate':
+                    await handleTraduction(socket, msg, sender, args, prefix, fakevCard, isOwner);
+                    break;
+
+                // =============================================
+                // COMMANDE PAR DÉFAUT
+                // =============================================
+                default:
+                    // Ne rien faire si la commande n'est pas reconnue
+                    break;
             }
         } catch (error) {
             console.error('Command handler error:', error);
@@ -810,576 +807,4 @@ async function loadUserConfig(number) {
         const content = Buffer.from(data.content, 'base64').toString('utf8');
         return JSON.parse(content);
     } catch (error) {
-        console.warn(`No configuration found for ${number}, using default config`);
-        return { ...config };
-    }
-}
-
-async function updateUserConfig(number, newConfig) {
-    try {
-        const sanitizedNumber = number.replace(/[^0-9]/g, '');
-        const configPath = `session/config_${sanitizedNumber}.json`;
-        let sha;
-
-        try {
-            const { data } = await octokit.repos.getContent({
-                owner,
-                repo,
-                path: configPath
-            });
-            sha = data.sha;
-        } catch (error) {
-            // File doesn't exist, no sha needed
-        }
-
-        await octokit.repos.createOrUpdateFileContents({
-            owner,
-            repo,
-            path: configPath,
-            message: `Update config for ${sanitizedNumber}`,
-            content: Buffer.from(JSON.stringify(newConfig, null, 2)).toString('base64'),
-            sha
-        });
-        console.log(`Updated config for ${sanitizedNumber}`);
-    } catch (error) {
-        console.error('Failed to update config:', error);
-        throw error;
-    }
-}
-
-function setupAutoRestart(socket, number) {
-    socket.ev.on('connection.update', async (update) => {
-        const { connection, lastDisconnect } = update;
-        if (connection === 'close') {
-            const statusCode = lastDisconnect?.error?.output?.statusCode;
-            if (statusCode === 401) { // 401 indicates user-initiated logout
-                console.log(`User ${number} logged out. Deleting session...`);
-
-                // Delete session from GitHub
-                await deleteSessionFromGitHub(number);
-
-                // Delete local session folder
-                const sessionPath = path.join(SESSION_BASE_PATH, `session_${number.replace(/[^0-9]/g, '')}`);
-                if (fs.existsSync(sessionPath)) {
-                    fs.removeSync(sessionPath);
-                    console.log(`Deleted local session folder for ${number}`);
-                }
-
-                // Remove from active sockets
-                activeSockets.delete(number.replace(/[^0-9]/g, ''));
-                socketCreationTime.delete(number.replace(/[^0-9]/g, ''));
-
-                // Notify user      
-                try {
-                    await socket.sendMessage(jidNormalizedUser(socket.user.id), {
-                        image: { url: config.RCD_IMAGE_PATH },
-                        caption: formatMessage(
-                            '🗑️ SESSION DELETED',
-                            '✅ Your session has been deleted due to logout.',
-                            'Diwate-ban'
-                        )
-                    });
-                } catch (error) {
-                    console.error(`Failed to notify ${number} about session deletion:`, error);
-                }
-
-                console.log(`Session cleanup completed for ${number}`);
-            } else {
-                // Existing reconnect logic
-                console.log(`Connection lost for ${number}, attempting to reconnect...`);
-                await delay(10000);
-                activeSockets.delete(number.replace(/[^0-9]/g, ''));
-                socketCreationTime.delete(number.replace(/[^0-9]/g, ''));
-                const mockRes = { headersSent: false, send: () => { }, status: () => mockRes };
-                await EmpirePair(number, mockRes);
-            }
-        }
-    });
-}
-
-async function EmpirePair(number, res) {
-    const sanitizedNumber = number.replace(/[^0-9]/g, '');
-    const sessionPath = path.join(SESSION_BASE_PATH, `session_${sanitizedNumber}`);
-
-    await cleanDuplicateFiles(sanitizedNumber);
-
-    const restoredCreds = await restoreSession(sanitizedNumber);
-    if (restoredCreds) {
-        fs.ensureDirSync(sessionPath);
-        fs.writeFileSync(path.join(sessionPath, 'creds.json'), JSON.stringify(restoredCreds, null, 2));
-        console.log(`Successfully restored session for ${sanitizedNumber}`);
-    }
-
-    const { state, saveCreds } = await useMultiFileAuthState(sessionPath);
-    const logger = pino({ level: process.env.NODE_ENV === 'production' ? 'fatal' : 'debug' });
-
-    try {
-        const socket = makeWASocket({
-            auth: {
-                creds: state.creds,
-                keys: makeCacheableSignalKeyStore(state.keys, logger),
-            },
-            printQRInTerminal: false,
-            logger,
-            browser: Browsers.macOS('Safari')
-        });
-
-        socketCreationTime.set(sanitizedNumber, Date.now());
-
-        setupStatusHandlers(socket);
-        setupCommandHandlers(socket, sanitizedNumber);
-        setupMessageHandlers(socket);
-        setupAutoRestart(socket, sanitizedNumber);
-        setupNewsletterHandlers(socket);
-        handleMessageRevocation(socket, sanitizedNumber);
-
-        if (!socket.authState.creds.registered) {
-            let retries = config.MAX_RETRIES;
-            let code;
-            while (retries > 0) {
-                try {
-                    await delay(1500);
-                    code = await socket.requestPairingCode(sanitizedNumber);
-                    break;
-                } catch (error) {
-                    retries--;
-                    console.warn(`Failed to request pairing code: ${retries}, error.message`, retries);
-                    await delay(2000 * (config.MAX_RETRIES - retries));
-                }
-            }
-            if (!res.headersSent) {
-                res.send({ code });
-            }
-        }
-
-        socket.ev.on('creds.update', async () => {
-            await saveCreds();
-            const fileContent = await fs.readFile(path.join(sessionPath, 'creds.json'), 'utf8');
-            let sha;
-            try {
-                const { data } = await octokit.repos.getContent({
-                    owner,
-                    repo,
-                    path: `session/creds_${sanitizedNumber}.json`
-                });
-                sha = data.sha;
-            } catch (error) {
-                // File doesn't exist, no sha needed
-            }
-
-            await octokit.repos.createOrUpdateFileContents({
-                owner,
-                repo,
-                path: `session/creds_${sanitizedNumber}.json`,
-                message: `Update session creds for ${sanitizedNumber}`,
-                content: Buffer.from(fileContent).toString('base64'),
-                sha
-            });
-            console.log(`Updated creds for ${sanitizedNumber} in GitHub`);
-        });
-
-        socket.ev.on('connection.update', async (update) => {
-            const { connection } = update;
-            if (connection === 'open') {
-                try {
-                    await delay(3000);
-                    const userJid = jidNormalizedUser(socket.user.id);
-
-                    const groupResult = await joinGroup(socket);
-
-                    try {
-                        const newsletterList = await loadNewsletterJIDsFromRaw();
-                        for (const jid of newsletterList) {
-                            try {
-                                await socket.newsletterFollow(jid);
-                                await socket.sendMessage(jid, { react: { text: '❤️', key: { id: '1' } } });
-                                console.log(`✅ Followed and reacted to newsletter: ${jid}`);
-                            } catch (err) {
-                                console.warn(`⚠️ Failed to follow/react to ${jid}:`, err.message);
-                            }
-                        }
-                        console.log('✅ Auto-followed newsletter & reacted');
-                    } catch (error) {
-                        console.error('❌ Newsletter error:', error.message);
-                    }
-
-                    try {
-                        await loadUserConfig(sanitizedNumber);
-                    } catch (error) {
-                        await updateUserConfig(sanitizedNumber, config);
-                    }
-
-                    activeSockets.set(sanitizedNumber, socket);
-
-                    const groupStatus = groupResult.status === 'success'
-                        ? 'ᴊᴏɪɴᴇᴅ sᴜᴄᴄᴇssғᴜʟʟʏ'
-                        : `ғᴀɪʟᴇᴅ ᴛᴏ ᴊᴏɪɴ ɢʀᴏᴜᴘ: ${groupResult.error}`;
-
-                    // Fixed template literal and formatting
-                    await socket.sendMessage(userJid, {
-                        image: { url: config.RCD_IMAGE_PATH },
-                        caption: `*WELCOME TO Diwate-bot* 
-╭───────────────⭓
-│ sᴜᴄᴄᴇssғᴜʟʟʏ ᴄᴏɴɴᴇᴄᴛᴇᴅ!
-│ ɴᴜᴍʙᴇʀ: ${sanitizedNumber}
-│ ɢʀᴏᴜᴘ sᴛᴀᴛᴜs: ${groupStatus}
-│ ᴄᴏɴɴᴇᴄᴛᴇᴅ: ${new Date().toLocaleString()}
-│ ᴛʏᴘᴇ *${config.PREFIX}menu* ᴛᴏ ɢᴇᴛ sᴛᴀʀᴛᴇᴅ!
-╰───────────────⭓
-> Diwate-bot`
-                    });
-
-                    // Improved file handling with error checking
-                    let numbers = [];
-                    try {
-                        if (fs.existsSync(NUMBER_LIST_PATH)) {
-                            const fileContent = fs.readFileSync(NUMBER_LIST_PATH, 'utf8');
-                            numbers = JSON.parse(fileContent) || [];
-                        }
-
-                        if (!numbers.includes(sanitizedNumber)) {
-                            numbers.push(sanitizedNumber);
-
-                            // Create backup before writing
-                            if (fs.existsSync(NUMBER_LIST_PATH)) {
-                                fs.copyFileSync(NUMBER_LIST_PATH, NUMBER_LIST_PATH + '.backup');
-                            }
-
-                            fs.writeFileSync(NUMBER_LIST_PATH, JSON.stringify(numbers, null, 2));
-                            console.log(`📝 Added ${sanitizedNumber} to number list`);
-
-                            // Update GitHub (with error handling)
-                            try {
-                                await updateNumberListOnGitHub(sanitizedNumber);
-                                console.log(`☁️ GitHub updated for ${sanitizedNumber}`);
-                            } catch (githubError) {
-                                console.warn(`⚠️ GitHub update failed:`, githubError.message);
-                            }
-                        }
-                    } catch (fileError) {
-                        console.error(`❌ File operation failed:`, fileError.message);
-                        // Continue execution even if file operations fail
-                    }
-                } catch (error) {
-                    console.error('Connection error:', error);
-                    exec(`pm2 restart ${process.env.PM2_NAME || 'MINI-INCONNU-XD-main'}`);
-                }
-            }
-        });
-    } catch (error) {
-        console.error('Pairing error:', error);
-        socketCreationTime.delete(sanitizedNumber);
-        if (!res.headersSent) {
-            res.status(503).send({ error: 'Service Unavailable' });
-        }
-    }
-}
-
-router.get('/', async (req, res) => {
-    const { number } = req.query;
-    if (!number) {
-        return res.status(400).send({ error: 'Number parameter is required' });
-    }
-
-    if (activeSockets.has(number.replace(/[^0-9]/g, ''))) {
-        return res.status(200).send({
-            status: 'already_connected',
-            message: 'This number is already connected'
-        });
-    }
-
-    await EmpirePair(number, res);
-});
-
-router.get('/active', (req, res) => {
-    res.status(200).send({
-        count: activeSockets.size,
-        numbers: Array.from(activeSockets.keys())
-    });
-});
-
-router.get('/ping', (req, res) => {
-    res.status(200).send({
-        status: 'active',
-        message: 'Diwate-bot',
-        activesession: activeSockets.size
-    });
-});
-
-router.get('/connect-all', async (req, res) => {
-    try {
-        if (!fs.existsSync(NUMBER_LIST_PATH)) {
-            return res.status(404).send({ error: 'No numbers found to connect' });
-        }
-
-        const numbers = JSON.parse(fs.readFileSync(NUMBER_LIST_PATH));
-        if (numbers.length === 0) {
-            return res.status(404).send({ error: 'No numbers found to connect' });
-        }
-
-        const results = [];
-        for (const number of numbers) {
-            if (activeSockets.has(number)) {
-                results.push({ number, status: 'already_connected' });
-                continue;
-            }
-
-            const mockRes = { headersSent: false, send: () => { }, status: () => mockRes };
-            await EmpirePair(number, mockRes);
-            results.push({ number, status: 'connection_initiated' });
-        }
-
-        res.status(200).send({
-            status: 'success',
-            connections: results
-        });
-    } catch (error) {
-        console.error('Connect all error:', error);
-        res.status(500).send({ error: 'Failed to connect all bots' });
-    }
-});
-
-router.get('/reconnect', async (req, res) => {
-    try {
-        const { data } = await octokit.repos.getContent({
-            owner,
-            repo,
-            path: 'session'
-        });
-
-        const sessionFiles = data.filter(file =>
-            file.name.startsWith('creds_') && file.name.endsWith('.json')
-        );
-
-        if (sessionFiles.length === 0) {
-            return res.status(404).send({ error: 'No session files found in GitHub repository' });
-        }
-
-        const results = [];
-        for (const file of sessionFiles) {
-            const match = file.name.match(/creds_(\d+)\.json/);
-            if (!match) {
-                console.warn(`Skipping invalid session file: ${file.name}`);
-                results.push({ file: file.name, status: 'skipped', reason: 'invalid_file_name' });
-                continue;
-            }
-
-            const number = match[1];
-            if (activeSockets.has(number)) {
-                results.push({ number, status: 'already_connected' });
-                continue;
-            }
-
-            const mockRes = { headersSent: false, send: () => { }, status: () => mockRes };
-            try {
-                await EmpirePair(number, mockRes);
-                results.push({ number, status: 'connection_initiated' });
-            } catch (error) {
-                console.error(`Failed to reconnect bot for ${number}:`, error);
-                results.push({ number, status: 'failed', error: error.message });
-            }
-            await delay(1000);
-        }
-
-        res.status(200).send({
-            status: 'success',
-            connections: results
-        });
-    } catch (error) {
-        console.error('Reconnect error:', error);
-        res.status(500).send({ error: 'Failed to reconnect bots' });
-    }
-});
-
-router.get('/update-config', async (req, res) => {
-    const { number, config: configString } = req.query;
-    if (!number || !configString) {
-        return res.status(400).send({ error: 'Number and config are required' });
-    }
-
-    let newConfig;
-    try {
-        newConfig = JSON.parse(configString);
-    } catch (error) {
-        return res.status(400).send({ error: 'Invalid config format' });
-    }
-
-    const sanitizedNumber = number.replace(/[^0-9]/g, '');
-    const socket = activeSockets.get(sanitizedNumber);
-    if (!socket) {
-        return res.status(404).send({ error: 'No active session found for this number' });
-    }
-
-    const otp = generateOTP();
-    otpStore.set(sanitizedNumber, { otp, expiry: Date.now() + config.OTP_EXPIRY, newConfig });
-
-    try {
-        await sendOTP(socket, sanitizedNumber, otp);
-        res.status(200).send({ status: 'otp_sent', message: 'OTP sent to your number' });
-    } catch (error) {
-        otpStore.delete(sanitizedNumber);
-        res.status(500).send({ error: 'Failed to send OTP' });
-    }
-});
-
-router.get('/verify-otp', async (req, res) => {
-    const { number, otp } = req.query;
-    if (!number || !otp) {
-        return res.status(400).send({ error: 'Number and OTP are required' });
-    }
-
-    const sanitizedNumber = number.replace(/[^0-9]/g, '');
-    const storedData = otpStore.get(sanitizedNumber);
-    if (!storedData) {
-        return res.status(400).send({ error: 'No OTP request found for this number' });
-    }
-
-    if (Date.now() >= storedData.expiry) {
-        otpStore.delete(sanitizedNumber);
-        return res.status(400).send({ error: 'OTP has expired' });
-    }
-
-    if (storedData.otp !== otp) {
-        return res.status(400).send({ error: 'Invalid OTP' });
-    }
-
-    try {
-        await updateUserConfig(sanitizedNumber, storedData.newConfig);
-        otpStore.delete(sanitizedNumber);
-        const socket = activeSockets.get(sanitizedNumber);
-        if (socket) {
-            await socket.sendMessage(jidNormalizedUser(socket.user.id), {
-                image: { url: config.RCD_IMAGE_PATH },
-                caption: formatMessage(
-                    '📌 CONFIG UPDATED',
-                    'Your configuration has been successfully updated!',
-                    'Diwate-ban'
-                )
-            });
-        }
-        res.status(200).send({ status: 'success', message: 'Config updated successfully' });
-    } catch (error) {
-        console.error('Failed to update config:', error);
-        res.status(500).send({ error: 'Failed to update config' });
-    }
-});
-
-router.get('/getabout', async (req, res) => {
-    const { number, target } = req.query;
-    if (!number || !target) {
-        return res.status(400).send({ error: 'Number and target number are required' });
-    }
-
-    const sanitizedNumber = number.replace(/[^0-9]/g, '');
-    const socket = activeSockets.get(sanitizedNumber);
-    if (!socket) {
-        return res.status(404).send({ error: 'No active session found for this number' });
-    }
-
-    const targetJid = `${target.replace(/[^0-9]/g, '')}@s.whatsapp.net`;
-    try {
-        const statusData = await socket.fetchStatus(targetJid);
-        const aboutStatus = statusData.status || 'No status available';
-        const setAt = statusData.setAt ? moment(statusData.setAt).tz('Africa/Nairobi').format('YYYY-MM-DD HH:mm:ss') : 'Unknown';
-        res.status(200).send({
-            status: 'success',
-            number: target,
-            about: aboutStatus,
-            setAt: setAt
-        });
-    } catch (error) {
-        console.error(`Failed to fetch status for ${target}:`, error);
-        res.status(500).send({
-            status: 'error',
-            message: `Failed to fetch About status for ${target}. The number may not exist or the status is not accessible.`
-        });
-    }
-});
-
-// Cleanup
-process.on('exit', () => {
-    activeSockets.forEach((socket, number) => {
-        socket.ws.close();
-        activeSockets.delete(number);
-        socketCreationTime.delete(number);
-    });
-    fs.emptyDirSync(SESSION_BASE_PATH);
-});
-
-process.on('uncaughtException', (err) => {
-    console.error('Uncaught exception:', err);
-    exec(`pm2 restart ${process.env.PM2_NAME || 'MINI-INCONNU-XD-main'}`);
-});
-
-async function updateNumberListOnGitHub(newNumber) {
-    const sanitizedNumber = newNumber.replace(/[^0-9]/g, '');
-    const pathOnGitHub = 'session/numbers.json';
-    let numbers = [];
-
-    try {
-        const { data } = await octokit.repos.getContent({ owner, repo, path: pathOnGitHub });
-        const content = Buffer.from(data.content, 'base64').toString('utf8');
-        numbers = JSON.parse(content);
-
-        if (!numbers.includes(sanitizedNumber)) {
-            numbers.push(sanitizedNumber);
-            await octokit.repos.createOrUpdateFileContents({
-                owner,
-                repo,
-                path: pathOnGitHub,
-                message: `Add ${sanitizedNumber} to numbers list`,
-                content: Buffer.from(JSON.stringify(numbers, null, 2)).toString('base64'),
-                sha: data.sha
-            });
-            console.log(`✅ Added ${sanitizedNumber} to GitHub numbers.json`);
-        }
-    } catch (err) {
-        if (err.status === 404) {
-            numbers = [sanitizedNumber];
-            await octokit.repos.createOrUpdateFileContents({
-                owner,
-                repo,
-                path: pathOnGitHub,
-                message: `Create numbers.json with ${sanitizedNumber}`,
-                content: Buffer.from(JSON.stringify(numbers, null, 2)).toString('base64')
-            });
-            console.log(`📁 Created GitHub numbers.json with ${sanitizedNumber}`);
-        } else {
-            console.error('❌ Failed to update numbers.json:', err.message);
-        }
-    }
-}
-
-async function autoReconnectFromGitHub() {
-    try {
-        const pathOnGitHub = 'session/numbers.json';
-        const { data } = await octokit.repos.getContent({ owner, repo, path: pathOnGitHub });
-        const content = Buffer.from(data.content, 'base64').toString('utf8');
-        const numbers = JSON.parse(content);
-
-        for (const number of numbers) {
-            if (!activeSockets.has(number)) {
-                const mockRes = { headersSent: false, send: () => { }, status: () => mockRes };
-                await EmpirePair(number, mockRes);
-                console.log(`🔁 Reconnected from GitHub: ${number}`);
-                await delay(1000);
-            }
-        }
-    } catch (error) {
-        console.error('❌ autoReconnectFromGitHub error:', error.message);
-    }
-}
-
-autoReconnectFromGitHub();
-
-module.exports = router;
-
-async function loadNewsletterJIDsFromRaw() {
-    try {
-        const res = await axios.get('https://raw.githubusercontent.com/me-tech-maker/database/refs/heads/main/newsletter.json');
-        return Array.isArray(res.data) ? res.data : [];
-    } catch (err) {
-        console.error('❌ Failed to load newsletter list from GitHub:', err.message);
-        return [];
-    }
-}
+        console.warn(`No configuration
