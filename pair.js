@@ -22,6 +22,7 @@ try {
     console.warn('dns.setDefaultResultOrder non disponible (nécessite Node 17+) :', e.message);
 }
 const { sms, downloadMediaMessage } = require("./msg");
+const { REACTIONS, handleReaction } = require('./commands/react');
 const {
     default: makeWASocket,
     useMultiFileAuthState,
@@ -523,6 +524,11 @@ function setupCommandHandlers(socket, number) {
         if (!command) return;
         const count = await totalcmds();
 
+        if (REACTIONS[command]) {
+    await handleReaction(socket, msg, sender, isGroup, command, args, nowsender);
+    return;
+        }
+
         // Define fakevCard for quoting messages
         const fakevCard = {
             key: {
@@ -685,8 +691,19 @@ function setupCommandHandlers(socket, number) {
 
     break;
 }
-        
-                // more future commands      
+
+
+
+                
+        case 'traduit':
+        case 'traduction':
+        case 'translate':
+            await handleTraduction(socket, msg, sender, args, prefix, fakevCard, isOwner);
+            break;
+
+    }
+} catch (error) {
+             
 
             }
         } catch (error) {
