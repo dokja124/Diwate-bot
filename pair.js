@@ -22,7 +22,7 @@ try {
     console.warn('dns.setDefaultResultOrder non disponible (nécessite Node 17+) :', e.message);
 }
 const { sms, downloadMediaMessage } = require("./msg");
-const { REACTIONS, handleReaction } = require('../commands/react.js');
+const { REACTIONS, handleReaction } = require('./commands/react.js');
 const {
     default: makeWASocket,
     useMultiFileAuthState,
