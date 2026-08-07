@@ -12,37 +12,37 @@ try {
 // 1. LANGUES DISPONIBLES
 // =============================================
 const LANGUES = {
-    'français': { code: 'fr', emoji: '🇫🇷' },
-    'anglais': { code: 'en', emoji: '🇬🇧' },
-    'espagnol': { code: 'es', emoji: '🇪🇸' },
-    'japonais': { code: 'ja', emoji: '🇯🇵' },
-    'allemand': { code: 'de', emoji: '🇩🇪' },
-    'italien': { code: 'it', emoji: '🇮🇹' },
-    'portugais': { code: 'pt', emoji: '🇵🇹' },
-    'chinois': { code: 'zh', emoji: '🇨🇳' },
-    'coréen': { code: 'ko', emoji: '🇰🇷' },
-    'arabe': { code: 'ar', emoji: '🇸🇦' },
-    'russe': { code: 'ru', emoji: '🇷🇺' },
-    'créole haïtien': { code: 'ht', emoji: '🇭🇹' },
-    'créole': { code: 'ht', emoji: '🇭🇹' },
-    'ht': { code: 'ht', emoji: '🇭🇹' },
-    'néerlandais': { code: 'nl', emoji: '🇳🇱' },
-    'turc': { code: 'tr', emoji: '🇹🇷' },
-    'hindi': { code: 'hi', emoji: '🇮🇳' },
-    'indonésien': { code: 'id', emoji: '🇮🇩' },
-    'vietnamien': { code: 'vi', emoji: '🇻🇳' },
-    'thaïlandais': { code: 'th', emoji: '🇹🇭' },
-    'fr': { code: 'fr', emoji: '🇫🇷' },
-    'en': { code: 'en', emoji: '🇬🇧' },
-    'es': { code: 'es', emoji: '🇪🇸' },
-    'ja': { code: 'ja', emoji: '🇯🇵' },
-    'de': { code: 'de', emoji: '🇩🇪' },
-    'it': { code: 'it', emoji: '🇮🇹' },
-    'pt': { code: 'pt', emoji: '🇵🇹' },
-    'zh': { code: 'zh', emoji: '🇨🇳' },
-    'ko': { code: 'ko', emoji: '🇰🇷' },
-    'ar': { code: 'ar', emoji: '🇸🇦' },
-    'ru': { code: 'ru', emoji: '🇷🇺' },
+    'français': { code: 'fr', emoji: '🇫🇷', nomAnglais: 'French' },
+    'anglais': { code: 'en', emoji: '🇬🇧', nomAnglais: 'English' },
+    'espagnol': { code: 'es', emoji: '🇪🇸', nomAnglais: 'Spanish' },
+    'japonais': { code: 'ja', emoji: '🇯🇵', nomAnglais: 'Japanese' },
+    'allemand': { code: 'de', emoji: '🇩🇪', nomAnglais: 'German' },
+    'italien': { code: 'it', emoji: '🇮🇹', nomAnglais: 'Italian' },
+    'portugais': { code: 'pt', emoji: '🇵🇹', nomAnglais: 'Portuguese' },
+    'chinois': { code: 'zh', emoji: '🇨🇳', nomAnglais: 'Chinese' },
+    'coréen': { code: 'ko', emoji: '🇰🇷', nomAnglais: 'Korean' },
+    'arabe': { code: 'ar', emoji: '🇸🇦', nomAnglais: 'Arabic' },
+    'russe': { code: 'ru', emoji: '🇷🇺', nomAnglais: 'Russian' },
+    'créole haïtien': { code: 'ht', emoji: '🇭🇹', nomAnglais: 'Haitian Creole' },
+    'créole': { code: 'ht', emoji: '🇭🇹', nomAnglais: 'Haitian Creole' },
+    'ht': { code: 'ht', emoji: '🇭🇹', nomAnglais: 'Haitian Creole' },
+    'néerlandais': { code: 'nl', emoji: '🇳🇱', nomAnglais: 'Dutch' },
+    'turc': { code: 'tr', emoji: '🇹🇷', nomAnglais: 'Turkish' },
+    'hindi': { code: 'hi', emoji: '🇮🇳', nomAnglais: 'Hindi' },
+    'indonésien': { code: 'id', emoji: '🇮🇩', nomAnglais: 'Indonesian' },
+    'vietnamien': { code: 'vi', emoji: '🇻🇳', nomAnglais: 'Vietnamese' },
+    'thaïlandais': { code: 'th', emoji: '🇹🇭', nomAnglais: 'Thai' },
+    'fr': { code: 'fr', emoji: '🇫🇷', nomAnglais: 'French' },
+    'en': { code: 'en', emoji: '🇬🇧', nomAnglais: 'English' },
+    'es': { code: 'es', emoji: '🇪🇸', nomAnglais: 'Spanish' },
+    'ja': { code: 'ja', emoji: '🇯🇵', nomAnglais: 'Japanese' },
+    'de': { code: 'de', emoji: '🇩🇪', nomAnglais: 'German' },
+    'it': { code: 'it', emoji: '🇮🇹', nomAnglais: 'Italian' },
+    'pt': { code: 'pt', emoji: '🇵🇹', nomAnglais: 'Portuguese' },
+    'zh': { code: 'zh', emoji: '🇨🇳', nomAnglais: 'Chinese' },
+    'ko': { code: 'ko', emoji: '🇰🇷', nomAnglais: 'Korean' },
+    'ar': { code: 'ar', emoji: '🇸🇦', nomAnglais: 'Arabic' },
+    'ru': { code: 'ru', emoji: '🇷🇺', nomAnglais: 'Russian' },
 };
 
 // Correspondance ISO 639-3 (franc) -> ISO 639-1
@@ -53,7 +53,13 @@ const FRANC_VERS_ISO1 = {
     vie: 'vi', tha: 'th'
 };
 
-// ⚠️ Remplace par ton propre e-mail (aucune inscription requise, juste un identifiant)
+// ⚠️ Clé Gemini (Google AI Studio) - gratuite, sans carte bancaire
+// Idéalement mets-la en variable d'environnement GEMINI_API_KEY sur Render (Settings > Environment)
+// plutôt que de la laisser en dur ici si ton repo GitHub devient public un jour.
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || 'AQ.Ab8RN6Iwt4xMn0idc_kMhz2q1j7yWLKPrHmdsH3m2r4jzm5-6w';
+const GEMINI_MODEL = 'gemini-2.5-flash';
+
+// Email pour augmenter le quota MyMemory (solution de secours)
 const EMAIL_MYMEMORY = 'malandaniel250@gmail.com';
 
 // =============================================
@@ -71,8 +77,24 @@ function detecterLangue(texte) {
 }
 
 // =============================================
-// 3. PLUSIEURS FOURNISSEURS DE TRADUCTION (essayés dans l'ordre)
+// 3. FOURNISSEURS DE TRADUCTION (essayés dans l'ordre)
 // =============================================
+
+async function viaGemini(texte, source, cible, nomLangueCibleAnglais) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+    const prompt = `Translate the following text to ${nomLangueCibleAnglais}. Reply with ONLY the translation, no explanations, no quotation marks, no extra text.\n\nText: ${texte}`;
+
+    const response = await axios.post(url, {
+        contents: [{ parts: [{ text: prompt }] }]
+    }, {
+        timeout: 15000,
+        headers: { 'Content-Type': 'application/json' }
+    });
+
+    const texteTraduit = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!texteTraduit || texteTraduit.trim() === '') throw new Error('Gemini: réponse vide');
+    return texteTraduit.trim().replace(/^["']|["']$/g, '');
+}
 
 async function viaMyMemory(texte, source, cible) {
     const response = await axios.get('https://api.mymemory.translated.net/get', {
@@ -89,22 +111,6 @@ async function viaMyMemory(texte, source, cible) {
     return texteTraduit;
 }
 
-async function viaLibreTranslate(texte, source, cible) {
-    const src = source === 'inconnue' ? 'auto' : source;
-    const response = await axios.post('https://libretranslate.de/translate', {
-        q: texte,
-        source: src,
-        target: cible,
-        format: 'text'
-    }, {
-        timeout: 8000,
-        headers: { 'Content-Type': 'application/json' }
-    });
-    const texteTraduit = response.data?.translatedText;
-    if (!texteTraduit || texteTraduit.trim() === '') throw new Error('LibreTranslate: réponse vide');
-    return texteTraduit;
-}
-
 async function viaLingva(texte, source, cible) {
     const src = source === 'inconnue' ? 'auto' : source;
     const url = `https://lingva.ml/api/v1/${src}/${cible}/${encodeURIComponent(texte)}`;
@@ -116,24 +122,24 @@ async function viaLingva(texte, source, cible) {
 
 /**
  * Essaie chaque fournisseur dans l'ordre jusqu'à ce qu'un fonctionne.
- * Ne renvoie une erreur que si TOUS ont échoué.
+ * Gemini en premier (clé personnelle, pas de blocage IP partagée),
+ * puis MyMemory et Lingva en secours si Gemini est indisponible.
  */
-async function traduireTexte(texte, langueCible, langueSourceDetectee) {
+async function traduireTexte(texte, langueCible, langueSourceDetectee, nomLangueCibleAnglais) {
     const source = (langueSourceDetectee && langueSourceDetectee !== 'inconnue' && langueSourceDetectee !== langueCible)
         ? langueSourceDetectee
         : (langueCible === 'en' ? 'fr' : 'en');
 
     const fournisseurs = [
-        { nom: 'MyMemory', fn: viaMyMemory },
-        { nom: 'LibreTranslate', fn: viaLibreTranslate },
-        { nom: 'Lingva', fn: viaLingva },
+        { nom: 'Gemini', fn: () => viaGemini(texte, source, langueCible, nomLangueCibleAnglais) },
+        { nom: 'MyMemory', fn: () => viaMyMemory(texte, source, langueCible) },
+        { nom: 'Lingva', fn: () => viaLingva(texte, source, langueCible) },
     ];
 
     const erreurs = [];
     for (const { nom, fn } of fournisseurs) {
         try {
-            const resultat = await fn(texte, source, langueCible);
-            return resultat;
+            return await fn();
         } catch (error) {
             const status = error.response?.status;
             erreurs.push(`${nom}${status ? ` (HTTP ${status})` : ''}: ${error.message}`);
@@ -223,7 +229,7 @@ async function handleTraduction(socket, msg, sender, args, prefix, fakevCard, is
         await socket.sendMessage(sender, { react: { text: '⏳', key: msg.key } }).catch(() => {});
 
         const langueSource = detecterLangue(texte);
-        const texteTraduit = await traduireTexte(texte, langueInfo.code, langueSource);
+        const texteTraduit = await traduireTexte(texte, langueInfo.code, langueSource, langueInfo.nomAnglais);
 
         let sourceNom = langueSource;
         for (const [nom, info] of Object.entries(LANGUES)) {
@@ -260,4 +266,4 @@ module.exports = {
     traduireTexte,
     detecterLangue
 };
-                                     
+        
