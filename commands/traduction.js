@@ -65,13 +65,16 @@ async function traduireTexte(texte, langueCible) {
         }
         
         if (!texteTraduit || texteTraduit.trim() === '') {
-            throw new Error('Traduction vide');
+            throw new Error('Traduction vide (réponse Google inattendue: ' + JSON.stringify(data).slice(0, 200) + ')');
         }
         
         return texteTraduit;
     } catch (error) {
-        console.error('Erreur traduction:', error.message);
-        throw new Error('Impossible de traduire le texte');
+        // Log détaillé pour diagnostiquer la vraie cause (statut HTTP, timeout, etc.)
+        const status = error.response?.status;
+        const body = error.response?.data ? JSON.stringify(error.response.data).slice(0, 300) : '';
+        console.error('Erreur traduction:', error.message, status ? `[HTTP ${status}]` : '', body);
+        throw new Error(`Impossible de traduire le texte${status ? ` (HTTP ${status})` : ''}: ${error.message}`);
     }
 }
 
@@ -240,3 +243,4 @@ module.exports = {
     traduireTexte,
     detecterLangue
 };
+           
