@@ -1,102 +1,16 @@
 /**
  * url.js — Commande .url : renvoie un lien direct vers la photo/vidéo citée.
+ * Adapté pour gérer le message courant ou le message cité.
  */
 
 const axios = require('axios');
 const FormData = require('form-data');
+const fs = require('fs-extra');
+const path = require('path');
 
-/**
- * Récupère le message cité et tente d'extraire le média
- */
-function getQuotedMessage(msg) {
-    const contextInfo = msg.message?.extendedTextMessage?.contextInfo;
-    if (!contextInfo) return null;
-
-    // Essayer plusieurs chemins possibles
-    let quoted = contextInfo.quotedMessage;
-    if (!quoted) return null;
-
-    // Si quotedMessage est vide, on vérifie s'il y a un media dans contextInfo directement
-    if (Object.keys(quoted).length === 0) {
-        // Parfois le média est directement dans contextInfo
-        if (contextInfo.imageMessage) return { imageMessage: contextInfo.imageMessage };
-        if (contextInfo.videoMessage) return { videoMessage: contextInfo.videoMessage };
-        if (contextInfo.documentMessage) return { documentMessage: contextInfo.documentMessage };
-        return null;
-    }
-
-    return quoted;
-}
-
-/**
- * Extrait le média d'un message cité
- */
-function extractMedia(quoted) {
-    if (!quoted) return null;
-
-    const types = ['imageMessage', 'videoMessage', 'documentMessage', 'stickerMessage', 'audioMessage'];
-    for (const type of types) {
-        if (quoted[type]) {
-            return { mediaType: type.replace('Message', ''), mediaMsg: quoted[type] };
-        }
-    }
-
-    // Vérifier si le message cité contient un extendedTextMessage avec un média
-    if (quoted.extendedTextMessage) {
-        const subQuoted = quoted.extendedTextMessage.contextInfo?.quotedMessage;
-        if (subQuoted) {
-            for (const type of types) {
-                if (subQuoted[type]) {
-                    return { mediaType: type.replace('Message', ''), mediaMsg: subQuoted[type] };
-                }
-            }
-        }
-    }
-
-    return null;
-}
-
-/**
- * Télécharge le média cité
- */
-async function downloadMedia(socket, msg) {
-    try {
-        // 1. Récupérer le message cité
-        const quoted = getQuotedMessage(msg);
-        if (!quoted) {
-            console.log('❌ Aucun message cité trouvé.');
-            return null;
-        }
-
-        console.log('📌 Clés du message cité:', Object.keys(quoted));
-
-        // 2. Extraire le média du message cité
-        const media = extractMedia(quoted);
-        if (!media) {
-            console.log('❌ Aucun média trouvé dans le message cité.');
-            return null;
-        }
-
-        const { mediaType, mediaMsg } = media;
-        console.log(`✅ Média trouvé : ${mediaType}`);
-
-        // 3. Télécharger le média
-        const buffer = await socket.downloadMediaMessage(quoted);
-        if (!buffer) {
-            console.log('❌ Échec du téléchargement du média.');
-            return null;
-        }
-
-        return { buffer, mediaType, mediaMsg };
-    } catch (error) {
-        console.error('❌ Erreur dans downloadMedia:', error.message);
-        return null;
-    }
-}
-
-/**
- * Upload vers Catbox
- */
+// =============================================
+// 1. UPLOAD SUR CATBOX
+// =============================================
 async function uploadToCatbox(buffer, filename) {
     const form = new FormData();
     form.append('reqtype', 'fileupload');
@@ -105,36 +19,92 @@ async function uploadToCatbox(buffer, filename) {
     try {
         const response = await axios.post('https://catbox.moe/user/api.php', form, {
             headers: { ...form.getHeaders() },
-            timeout: 30000
+            timeout: 60000
         });
         return response.data.trim();
     } catch (error) {
         console.error('❌ Erreur upload Catbox:', error.message);
-        throw new Error('Échec de l\'upload vers l\'hébergeur.');
+        throw new Error('Échec de l\'upload vers Catbox.');
     }
 }
 
-/**
- * Commande .url
- */
+// =============================================
+// 2. RÉCUPÉRATION DU MÉDIA (BUFFER + EXTENSION)
+// =============================================
+async function getMediaBufferAndExt(socket, message) {
+    try {
+        const m = message.message || {};
+
+        if (m.imageMessage) {
+            const buffer = await socket.downloadMediaMessage(m.imageMessage);
+            return { buffer, ext: '.jpg' };
+        }
+        if (m.videoMessage) {
+            const buffer = await socket.downloadMediaMessage(m.videoMessage);
+            return { buffer, ext: '.mp4' };
+        }
+        if (m.audioMessage) {
+            const buffer = await socket.downloadMediaMessage(m.audioMessage);
+            return { buffer, ext: '.mp3' };
+        }
+        if (m.documentMessage) {
+            const buffer = await socket.downloadMediaMessage(m.documentMessage);
+            const fileName = m.documentMessage.fileName || 'file.bin';
+            const ext = path.extname(fileName) || '.bin';
+            return { buffer, ext };
+        }
+        if (m.stickerMessage) {
+            const buffer = await socket.downloadMediaMessage(m.stickerMessage);
+            return { buffer, ext: '.webp' };
+        }
+        return null;
+    } catch (error) {
+        console.error('❌ Erreur getMediaBufferAndExt:', error.message);
+        return null;
+    }
+}
+
+async function getQuotedMediaBufferAndExt(socket, message) {
+    const quoted = message.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+    if (!quoted) return null;
+    return getMediaBufferAndExt(socket, { message: quoted });
+}
+
+// =============================================
+// 3. COMMANDE PRINCIPALE .url
+// =============================================
 async function handleUrl(socket, msg, sender, fakevCard) {
     try {
-        const result = await downloadMedia(socket, msg);
-        if (!result) {
+        // 1. Essayer le message courant (si l'utilisateur a envoyé un média avec .url)
+        let media = await getMediaBufferAndExt(socket, msg);
+        // 2. Sinon, essayer le message cité (réponse à un média)
+        if (!media) media = await getQuotedMediaBufferAndExt(socket, msg);
+
+        if (!media) {
             await socket.sendMessage(sender, {
-                text: '❌ *Aucun média cité détecté.*\n\n📌 *Comment utiliser .url :*\n1. Envoie une photo ou une vidéo\n2. **Réponds** à ce message (glisse vers la droite) en tapant `.url`\n\n🔍 *Astuce :* Le bot cherche un média dans le message auquel tu réponds.'
+                text: '❌ *Aucun média trouvé.*\n\n📌 *Utilisation :*\n1. Envoie une photo, vidéo, sticker, audio ou document\n2. **Réponds** à ce message en tapant `.url`\n\n⚠️ *Important :* glisse vers la droite sur le message média pour répondre.'
             }, { quoted: fakevCard || msg });
             return true;
         }
 
-        const { buffer, mediaType } = result;
-        const ext = mediaType === 'image' ? 'jpg' : mediaType === 'video' ? 'mp4' : 'bin';
-        const filename = `media_${Date.now()}.${ext}`;
+        const { buffer, ext } = media;
+        const filename = `media_${Date.now()}${ext}`;
 
         const publicUrl = await uploadToCatbox(buffer, filename);
 
+        // Étiquette du type
+        const typeLabels = {
+            '.jpg': '📷 image',
+            '.png': '📷 image',
+            '.webp': '🎨 sticker',
+            '.mp4': '🎥 vidéo',
+            '.mp3': '🎵 audio',
+            '.bin': '📄 document'
+        };
+        const label = typeLabels[ext] || '📄 fichier';
+
         await socket.sendMessage(sender, {
-            text: `✅ *Lien ${mediaType === 'image' ? 'de l\'image' : mediaType === 'video' ? 'de la vidéo' : 'du fichier'} :*\n${publicUrl}\n\n🔗 *Cliquez pour visualiser ou télécharger.*`
+            text: `✅ *Lien de la ${label} :*\n${publicUrl}\n\n🔗 *Cliquez pour visualiser ou télécharger.*`
         }, { quoted: fakevCard || msg });
 
         return true;
