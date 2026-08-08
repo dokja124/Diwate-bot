@@ -196,8 +196,8 @@ async function handleRang(socket, msg, sender, isGroup, nowsender, args, fakevCa
         const roleGroupe = await getRoleGroupe(socket, msg, target, isGroup);
 
         const lignes = [
-            `╭─✧「 🏅 *CARTE DE RANG* 🏅 」✧─╮`,
-            `│`,                               `│`,
+            `╭─✧「 🏅 *CARTE RANG* 🏅 」✧─╮`,
+            `│`,                               
         ];
         if (nomAffichage) lignes.push(`│ 😎 *Nom :* ${nomAffichage}`);
         lignes.push(`│ 👤 *Utilisateur :* ${tag}`);
