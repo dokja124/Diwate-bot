@@ -33,6 +33,7 @@ const { handleAddProprio, isSecondaryOwner } = require('./commands/addproprio.js
 const { handleDelProprio } = require('./commands/delproprio.js');
 const { handleInfo } = require('./commands/info.js');
 const { handleCitation } = require('./commands/citation.js');
+const { handleSong } = require('./commands/song.js');
 const {
     default: makeWASocket,
     useMultiFileAuthState,
@@ -606,6 +607,8 @@ function setupCommandHandlers(socket, number) {
 ⭓───────────────⭓『 📱 TECH 📱 』
 │ 🍁 ${config.PREFIX}chiffre
 │ 🍁 ${config.PREFIX}dechiffre
+⭓───────────────⭓『 🎥 TELECHARGEMENT 🎥 』
+│ 🍁 ${config.PREFIX}song
 ⭓─────────────────────⭓
 > *Diwate-bot*
 `;
@@ -682,6 +685,13 @@ function setupCommandHandlers(socket, number) {
                 // Case: citation - Citation aléatoire d'un personnage de manga/anime
                 case 'citation': {
                     await handleCitation(socket, msg, sender, fakevCard);
+                    break;
+                }
+                // case: song - télécharger audio
+                case 'song':
+                case 'musique':
+                case 'music': {
+                    await handleSong(socket, msg, sender, isGroup, nowsender, args, fakevCard);
                     break;
                 }
                 // Case: spam - Block a WhatsApp number (owner only)
