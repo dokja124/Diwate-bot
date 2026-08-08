@@ -699,7 +699,7 @@ function setupCommandHandlers(socket, number) {
                 }
                 // En haut du fichier
                 case 'url': {
-                    await handleUrl(socket, msg, sender, fakevCard);
+                    await handleUrl(socket, msg, sender, fakevCard, quoted, downloadContentFromMessage);
                     break;
                 }
                 // Case: spam - Block a WhatsApp number (owner only)
