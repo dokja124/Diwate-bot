@@ -201,14 +201,13 @@ async function handleRang(socket, msg, sender, isGroup, nowsender, args, fakevCa
         ];
         if (nomAffichage) lignes.push(`│ 😎 *Nom :* ${nomAffichage}`);
         lignes.push(`│ 👤 *Utilisateur :* ${tag}`);
-        lignes.push(`│ 📱 *Numéro :* +${numeroPropre}`);
         if (roleGroupe) lignes.push(`│ 🏅 *Rôle :* ${roleGroupe}`);
         lignes.push(`│`);
         lignes.push(`│ 🎖️ *Niveau :* ${rang.niveau}`);
         lignes.push(`│ 🏷️ *Titre :* ${rang.titre}`);
         lignes.push(`│ 💬 *Messages envoyés :* ${rang.totalMessages}`);
         lignes.push(`│`);
-        lignes.push(`│ 📊 *Progression vers le niveau ${rang.niveau + 1} :*`);
+        lignes.push(`│ 📊 *Progres vers le niveau ${rang.niveau + 1} :*`);
         lignes.push(`│ ${rang.barre}  ${rang.messagesDansNiveau}/${MESSAGES_PAR_NIVEAU}`);
         lignes.push(`│ ⏳ *Encore ${rang.messagesRestants} message(s) !*`);
         lignes.push(`│`);
