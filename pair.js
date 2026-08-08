@@ -22,17 +22,17 @@ try {
     console.warn('dns.setDefaultResultOrder non disponible (nécessite Node 17+) :', e.message);
 }
 const { sms, downloadMediaMessage } = require("./msg");
-const { REACTIONS, handleReaction } = require('./commands/react');
-const { handleTraduction } = require('./traduction');
-const { handleBloque, isBlocked } = require('./bloque');
-const { handleDebloque } = require('./debloque');
-const { handleRang, incrementMessages } = require('./rang');
-const { handleChiffre } = require('./chiffre');
-const { handleDechiffre } = require('./dechiffre');
-const { handleAddProprio, isSecondaryOwner } = require('./addproprio');
-const { handleDelProprio } = require('./delproprio');
-const { handleInfo } = require('./info');
-const { handleCitation } = require('./citation');
+const { REACTIONS, handleReaction } = require('./commands/react.js');
+const { handleTraduction } = require('./commands/traduction.js');
+const { handleBloque, isBlocked } = require('./commands/bloque.js');
+const { handleDebloque } = require('./commands/debloque.js');
+const { handleRang, incrementMessages } = require('./commands/rang.js');
+const { handleChiffre } = require('./commands/chiffre.js');
+const { handleDechiffre } = require('./commands/dechiffre.js');
+const { handleAddProprio, isSecondaryOwner } = require('./commands/addproprio.js');
+const { handleDelProprio } = require('./commands/delproprio.js');
+const { handleInfo } = require('./commands/info.js');
+const { handleCitation } = require('./commands/citation.js');
 const {
     default: makeWASocket,
     useMultiFileAuthState,
@@ -569,26 +569,18 @@ function setupCommandHandlers(socket, number) {
                 case 'allmenu': {
                     await socket.sendMessage(sender, { react: { text: '📋', key: msg.key } });
                     const menuText = `
-╭───────────────⭓
-│ ʙᴏᴛ: *Diwate-bot*
-│ ᴘʀᴇғɪx: ${config.PREFIX}
-│ ᴅᴇᴠ: *Diwate*
-╰───────────────⭓
+╭──────────────────────⭓
+│🌟ʙᴏᴛ🌟: *Diwate-bot*
+│✨ᴘʀᴇғɪx✨: ${config.PREFIX}
+│👤ᴅᴇᴠ👤: *Diwate*
+╰─────────────────────⭓
 
-⭓───────────────⭓『 📋 ᴄᴏᴍᴍᴀɴᴅs 』
+⭓───────────────⭓『 👤 PROPRIO 👤 』
 │ 🍁 ${config.PREFIX}spam <numéro>
-│ 🍁 ${config.PREFIX}dev
 │ 🍁 ${config.PREFIX}bloque (répondre à un message)
 │ 🍁 ${config.PREFIX}debloque (répondre à un message)
-│ 🍁 ${config.PREFIX}rang
-│ 🍁 ${config.PREFIX}chiffre (répondre à un fichier)
-│ 🍁 ${config.PREFIX}dechiffre (répondre à un fichier chiffré)
 │ 🍁 ${config.PREFIX}add proprio (répondre à un message)
 │ 🍁 ${config.PREFIX}del proprio (répondre à un message)
-│ 🍁 ${config.PREFIX}info (répondre à un message)
-│ 🍁 ${config.PREFIX}citation
-╰──────────────────⭓
-
 ⭓───────────────⭓『 ✨ GIFS ✨ 』
 │ 🍁 ${config.PREFIX}gifle @qui
 │ 🍁 ${config.PREFIX}calin @qui
@@ -603,12 +595,18 @@ function setupCommandHandlers(socket, number) {
 │ 🍁 ${config.PREFIX}boum @qui
 │ 🍁 ${config.PREFIX}clin @qui
 │ 🍁 ${config.PREFIX}tape @qui
-╰──────────────────⭓
-
 ⭓───────────────⭓『 🤖 AI 🤖 』
 │ 🍁 ${config.PREFIX}traduit en <langue>
 │    (répondre à un message)
-╰──────────────────⭓
+⭓───────────────⭓『 👤 DEVELOPPEUR 👤 』
+│ 🍁 ${config.PREFIX}dev
+⭓───────────────⭓『 💫 FUN 💫 』
+│ 🍁 ${config.PREFIX}rang
+│ 🍁 ${config.PREFIX}citation
+⭓───────────────⭓『 📱 TECH 📱 』
+│ 🍁 ${config.PREFIX}chiffre
+│ 🍁 ${config.PREFIX}dechiffre
+⭓─────────────────────⭓
 > *Diwate-bot*
 `;
                     try {
