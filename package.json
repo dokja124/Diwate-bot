@@ -12,6 +12,8 @@
     "express": "latest",
     "body-parser": "latest",
     "axios": "latest",
+    "whatsapp-web.js": "^1.23.0",
+    "@distube/ytdl-core": "^4.13.5",
     "fs-extra": "latest",
     "pino": "latest",
     "jimp": "0.22.12",
