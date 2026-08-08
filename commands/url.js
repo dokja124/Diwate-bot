@@ -1,119 +1,86 @@
-/**
- * url.js — Commande .url : renvoie un lien direct vers la photo/vidéo citée.
- * Adapté pour gérer le message courant ou le message cité.
- */
-
 const axios = require('axios');
 const FormData = require('form-data');
-const fs = require('fs-extra');
-const path = require('path');
 
-// =============================================
-// 1. UPLOAD SUR CATBOX
-// =============================================
-async function uploadToCatbox(buffer, filename) {
-    const form = new FormData();
-    form.append('reqtype', 'fileupload');
-    form.append('fileToUpload', buffer, filename);
-
+/**
+ * Commande .url
+ * Répondre (reply) à une image ou une vidéo avec ".url" pour recevoir
+ * le lien direct du média (hébergé sur catbox.moe — gratuit, sans clé API).
+ *
+ * @param {object} socket - Le socket Baileys actif
+ * @param {object} msg - Le message WhatsApp reçu (contient .key pour la réaction/quote)
+ * @param {string} sender - Le JID du destinataire de la réponse
+ * @param {object} fakevCard - La carte utilisée pour "quoted" dans les réponses du bot
+ * @param {object|array} quoted - Le message cité (contextInfo.quotedMessage), déjà extrait dans pair.js
+ * @param {function} downloadContentFromMessage - Fonction Baileys pour télécharger le média cité
+ */
+async function handleUrl(socket, msg, sender, fakevCard, quoted, downloadContentFromMessage) {
     try {
-        const response = await axios.post('https://catbox.moe/user/api.php', form, {
-            headers: { ...form.getHeaders() },
-            timeout: 60000
-        });
-        return response.data.trim();
-    } catch (error) {
-        console.error('❌ Erreur upload Catbox:', error.message);
-        throw new Error('Échec de l\'upload vers Catbox.');
-    }
-}
+        const hasMedia = quoted && !Array.isArray(quoted) &&
+            (quoted.imageMessage || quoted.videoMessage || quoted.stickerMessage);
 
-// =============================================
-// 2. RÉCUPÉRATION DU MÉDIA (BUFFER + EXTENSION)
-// =============================================
-async function getMediaBufferAndExt(socket, message) {
-    try {
-        const m = message.message || {};
-
-        if (m.imageMessage) {
-            const buffer = await socket.downloadMediaMessage(m.imageMessage);
-            return { buffer, ext: '.jpg' };
-        }
-        if (m.videoMessage) {
-            const buffer = await socket.downloadMediaMessage(m.videoMessage);
-            return { buffer, ext: '.mp4' };
-        }
-        if (m.audioMessage) {
-            const buffer = await socket.downloadMediaMessage(m.audioMessage);
-            return { buffer, ext: '.mp3' };
-        }
-        if (m.documentMessage) {
-            const buffer = await socket.downloadMediaMessage(m.documentMessage);
-            const fileName = m.documentMessage.fileName || 'file.bin';
-            const ext = path.extname(fileName) || '.bin';
-            return { buffer, ext };
-        }
-        if (m.stickerMessage) {
-            const buffer = await socket.downloadMediaMessage(m.stickerMessage);
-            return { buffer, ext: '.webp' };
-        }
-        return null;
-    } catch (error) {
-        console.error('❌ Erreur getMediaBufferAndExt:', error.message);
-        return null;
-    }
-}
-
-async function getQuotedMediaBufferAndExt(socket, message) {
-    const quoted = message.message?.extendedTextMessage?.contextInfo?.quotedMessage;
-    if (!quoted) return null;
-    return getMediaBufferAndExt(socket, { message: quoted });
-}
-
-// =============================================
-// 3. COMMANDE PRINCIPALE .url
-// =============================================
-async function handleUrl(socket, msg, sender, fakevCard) {
-    try {
-        // 1. Essayer le message courant (si l'utilisateur a envoyé un média avec .url)
-        let media = await getMediaBufferAndExt(socket, msg);
-        // 2. Sinon, essayer le message cité (réponse à un média)
-        if (!media) media = await getQuotedMediaBufferAndExt(socket, msg);
-
-        if (!media) {
+        if (!hasMedia) {
             await socket.sendMessage(sender, {
-                text: '❌ *Aucun média trouvé.*\n\n📌 *Utilisation :*\n1. Envoie une photo, vidéo, sticker, audio ou document\n2. **Réponds** à ce message en tapant `.url`\n\n⚠️ *Important :* glisse vers la droite sur le message média pour répondre.'
-            }, { quoted: fakevCard || msg });
-            return true;
+                text: '❌ *Réponds à une image ou une vidéo avec la commande .url*'
+            }, { quoted: fakevCard });
+            return;
         }
 
-        const { buffer, ext } = media;
-        const filename = `media_${Date.now()}${ext}`;
+        await socket.sendMessage(sender, { react: { text: '🔗', key: msg.key } }).catch(() => {});
 
-        const publicUrl = await uploadToCatbox(buffer, filename);
+        let mediaMessage;
+        let downloadType;
+        let extension;
 
-        // Étiquette du type
-        const typeLabels = {
-            '.jpg': '📷 image',
-            '.png': '📷 image',
-            '.webp': '🎨 sticker',
-            '.mp4': '🎥 vidéo',
-            '.mp3': '🎵 audio',
-            '.bin': '📄 document'
-        };
-        const label = typeLabels[ext] || '📄 fichier';
+        if (quoted.imageMessage) {
+            mediaMessage = quoted.imageMessage;
+            downloadType = 'image';
+            extension = 'jpg';
+        } else if (quoted.videoMessage) {
+            mediaMessage = quoted.videoMessage;
+            downloadType = 'video';
+            extension = 'mp4';
+        } else {
+            mediaMessage = quoted.stickerMessage;
+            downloadType = 'image';
+            extension = 'webp';
+        }
+
+        // Téléchargement du média cité
+        const stream = await downloadContentFromMessage(mediaMessage, downloadType);
+        let buffer = Buffer.from([]);
+        for await (const chunk of stream) {
+            buffer = Buffer.concat([buffer, chunk]);
+        }
+
+        if (!buffer.length) {
+            throw new Error('Média vide après téléchargement');
+        }
+
+        // Upload vers catbox.moe : service gratuit, sans clé API, lien direct permanent
+        const form = new FormData();
+        form.append('reqtype', 'fileupload');
+        form.append('fileToUpload', buffer, { filename: `diwate_${Date.now()}.${extension}` });
+
+        const { data } = await axios.post('https://catbox.moe/user/api.php', form, {
+            headers: form.getHeaders(),
+            timeout: 30000
+        });
+
+        const link = typeof data === 'string' ? data.trim() : '';
+
+        if (!link.startsWith('http')) {
+            throw new Error(`Réponse inattendue du service d'hébergement: ${link}`);
+        }
 
         await socket.sendMessage(sender, {
-            text: `✅ *Lien de la ${label} :*\n${publicUrl}\n\n🔗 *Cliquez pour visualiser ou télécharger.*`
-        }, { quoted: fakevCard || msg });
+            text: `🔗 *Voici le lien de ton média :*\n\n${link}`
+        }, { quoted: fakevCard });
 
-        return true;
     } catch (error) {
-        console.error('❌ Erreur handleUrl:', error.message);
+        console.error('Erreur commande .url :', error);
         await socket.sendMessage(sender, {
-            text: `❌ *Erreur :*\n${error.message}`
-        }, { quoted: fakevCard || msg }).catch(() => {});
-        return true;
+            text: '❌ *Une erreur est survenue lors de la récupération du lien. Réessaie.*'
+        }, { quoted: fakevCard });
     }
 }
 
