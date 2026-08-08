@@ -78,39 +78,55 @@ function calculerRang(totalMessages) {
 }
 
 // =============================================
-// 4. RÉSOLUTION DU TARGET (AMÉLIORÉE)
+// 4. RÉSOLUTION DU TARGET (CORRIGÉE)
 // =============================================
-function resolveTarget(msg, args, sender) {
+function resolveTarget(msg, args, sender, isGroup, nowsender) {
     console.log('🔍 Résolution du target...');
     console.log('📝 Args:', args);
     console.log('👤 Sender:', sender);
+    console.log('🏠 isGroup:', isGroup);
+    console.log('👤 nowsender:', nowsender);
 
     try {
-        // 1. Vérifier les mentions dans le message
+        // 1. D'abord, vérifier si c'est une mention dans le message
         const contextInfo = msg.message?.extendedTextMessage?.contextInfo;
         
         if (contextInfo) {
             // Vérifier les mentions
             if (contextInfo.mentionedJid && contextInfo.mentionedJid.length > 0) {
                 const jid = contextInfo.mentionedJid[0];
-                console.log('✅ Mention trouvée:', jid);
-                return jid;
+                // Si c'est un JID de groupe, ignorer
+                if (!jid.includes('@g.us')) {
+                    console.log('✅ Mention trouvée:', jid);
+                    return jid;
+                }
             }
 
-            // Vérifier si un message est cité
+            // Vérifier si un message est cité (reply)
             if (contextInfo.participant) {
-                console.log('✅ Citation trouvée:', contextInfo.participant);
-                return contextInfo.participant;
+                const jid = contextInfo.participant;
+                console.log('✅ Citation trouvée:', jid);
+                return jid;
             }
         }
 
-        // 2. Vérifier les arguments
+        // 2. Vérifier les arguments (si un numéro est passé)
         if (args && args.length > 0) {
             const arg = args[0];
             console.log('🔍 Argument reçu:', arg);
 
-            // Nettoyer l'argument
-            let cleanArg = arg.replace(/[^0-9+]/g, '');
+            // Si c'est une mention avec @
+            if (arg.startsWith('@')) {
+                const number = arg.replace('@', '').replace(/[^0-9]/g, '');
+                if (number.length >= 8) {
+                    const jid = number + '@s.whatsapp.net';
+                    console.log('✅ Mention formatée:', jid);
+                    return jid;
+                }
+            }
+
+            // Nettoyer l'argument pour n'avoir que les chiffres
+            let cleanArg = arg.replace(/[^0-9]/g, '');
             
             // Si l'argument est un numéro de téléphone
             if (cleanArg.length >= 8) {
@@ -126,25 +142,25 @@ function resolveTarget(msg, args, sender) {
                 console.log('✅ Numéro formaté:', jid);
                 return jid;
             }
-
-            // Si l'argument est une mention (@nom)
-            if (arg.startsWith('@')) {
-                const number = arg.replace('@', '').replace(/[^0-9]/g, '');
-                if (number.length >= 8) {
-                    const jid = number + '@s.whatsapp.net';
-                    console.log('✅ Mention formatée:', jid);
-                    return jid;
-                }
-            }
         }
 
-        // 3. Par défaut, retourner l'expéditeur
-        console.log('✅ Target par défaut (sender):', sender);
-        return sender;
+        // 3. En dernier recours, utiliser l'expéditeur du message
+        // Pour un groupe, utiliser nowsender (le participant)
+        // Pour un privé, utiliser sender
+        let target = isGroup ? nowsender : sender;
+        
+        // Si target est un JID de groupe, utiliser sender à la place
+        if (target && target.includes('@g.us')) {
+            target = sender;
+        }
+        
+        console.log('✅ Target par défaut:', target);
+        return target;
 
     } catch (error) {
         console.error('❌ Erreur resolveTarget:', error);
-        return sender; // Fallback sur le sender
+        // Fallback: utiliser nowsender ou sender
+        return isGroup ? (nowsender || sender) : sender;
     }
 }
 
@@ -160,6 +176,12 @@ async function getContactInfo(socket, target, isGroup, groupJid) {
         roleGroupe: null,
         numero: target.split('@')[0]
     };
+
+    // Si c'est un JID de groupe, on ne peut pas récupérer les infos
+    if (target.includes('@g.us')) {
+        info.numero = 'Groupe';
+        return info;
+    }
 
     // --- Photo de profil ---
     try {
@@ -191,7 +213,7 @@ async function getContactInfo(socket, target, isGroup, groupJid) {
     }
 
     // --- Rôle dans le groupe ---
-    if (isGroup && groupJid) {
+    if (isGroup && groupJid && !groupJid.includes('@g.us')) {
         try {
             const groupMeta = await socket.groupMetadata(groupJid);
             const participant = groupMeta.participants.find(p => p.id === target);
@@ -210,7 +232,7 @@ async function getContactInfo(socket, target, isGroup, groupJid) {
 }
 
 // =============================================
-// 6. COMMANDE PRINCIPALE .rang (AMÉLIORÉE)
+// 6. COMMANDE PRINCIPALE .rang (CORRIGÉE)
 // =============================================
 async function handleRang(socket, msg, sender, isGroup, nowsender, args, fakevCard) {
     try {
@@ -218,11 +240,12 @@ async function handleRang(socket, msg, sender, isGroup, nowsender, args, fakevCa
         console.log('📝 Sender:', sender);
         console.log('📝 Args:', args);
         console.log('🏠 isGroup:', isGroup);
+        console.log('👤 nowsender:', nowsender);
 
-        // Résoudre la cible
-        let target = resolveTarget(msg, args, sender);
+        // Résoudre la cible - PASSER isGroup ET nowsender
+        let target = resolveTarget(msg, args, sender, isGroup, nowsender);
         
-        // Vérifier que target est valide
+        // Vérifier que target est valide et n'est pas un groupe
         if (!target || typeof target !== 'string') {
             console.error('❌ Target invalide:', target);
             await socket.sendMessage(sender, {
@@ -231,13 +254,19 @@ async function handleRang(socket, msg, sender, isGroup, nowsender, args, fakevCa
             return false;
         }
 
+        // Si target est un JID de groupe, utiliser le sender
+        if (target.includes('@g.us')) {
+            console.log('⚠️ Target est un groupe, utilisation du sender');
+            target = isGroup ? nowsender : sender;
+        }
+
         // S'assurer que le JID est au bon format
         if (!target.includes('@s.whatsapp.net') && !target.includes('@g.us')) {
             const cleanNumber = target.replace(/[^0-9+]/g, '');
             if (cleanNumber.length >= 8) {
                 target = cleanNumber + '@s.whatsapp.net';
             } else {
-                target = sender;
+                target = isGroup ? nowsender : sender;
             }
         }
 
@@ -257,7 +286,7 @@ async function handleRang(socket, msg, sender, isGroup, nowsender, args, fakevCa
         }
 
         // Si l'utilisateur n'existe pas, créer une entrée
-        if (totalMessages === 0) {
+        if (totalMessages === 0 && !target.includes('@g.us')) {
             const data = chargerRanks();
             if (!data[target]) {
                 data[target] = { messages: 0 };
@@ -278,7 +307,7 @@ async function handleRang(socket, msg, sender, isGroup, nowsender, args, fakevCa
         caption += `│\n`;
         caption += `│ 👤 *Utilisateur :* ${tag}\n`;
         
-        if (contactInfo.nomAffichage) {
+        if (contactInfo.nomAffichage && !target.includes('@g.us')) {
             caption += `│ 🏷️ *Nom :* ${contactInfo.nomAffichage}\n`;
         }
         
@@ -286,7 +315,7 @@ async function handleRang(socket, msg, sender, isGroup, nowsender, args, fakevCa
         caption += `│ 📶 *WhatsApp :* ${contactInfo.existeSurWhatsApp}\n`;
         caption += `│ 💬 *À propos :* ${contactInfo.statut}\n`;
         
-        if (contactInfo.roleGroupe) {
+        if (contactInfo.roleGroupe && !target.includes('@g.us')) {
             caption += `│ 🏅 *Rôle :* ${contactInfo.roleGroupe}\n`;
         }
         
