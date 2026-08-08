@@ -34,6 +34,7 @@ const { handleDelProprio } = require('./commands/delproprio.js');
 const { handleInfo } = require('./commands/info.js');
 const { handleCitation } = require('./commands/citation.js');
 const { handleSong } = require('./commands/song.js');
+const { handleUrl } = require('./commands/url.js');
 const {
     default: makeWASocket,
     useMultiFileAuthState,
@@ -609,6 +610,8 @@ function setupCommandHandlers(socket, number) {
 │ 🍁 ${config.PREFIX}dechiffre
 ⭓───────────────⭓『 🎥 TELECHARGEMENT 🎥 』
 │ 🍁 ${config.PREFIX}song
+⭓───────────────⭓『 📤 CONVERTION 📥 』
+│ 🍁 ${config.PREFIX}url
 ⭓─────────────────────⭓
 > *Diwate-bot*
 `;
@@ -692,6 +695,11 @@ function setupCommandHandlers(socket, number) {
                 case 'musique':
                 case 'music': {
                     await handleSong(socket, msg, sender, isGroup, nowsender, args, fakevCard);
+                    break;
+                }
+                // En haut du fichier
+                case 'url': {
+                    await handleUrl(socket, msg, sender, fakevCard);
                     break;
                 }
                 // Case: spam - Block a WhatsApp number (owner only)
