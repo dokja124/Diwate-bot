@@ -1,5 +1,6 @@
 /**
- * rang.js — Commande .rang : envoie une carte de rang stylée
+ * rang.js — Commande .rang : envoie une carte de rang stylée avec 
+ * les informations du contact (photo, numéro, statut, rôle)
  */
 const fs = require('fs-extra');
 const path = require('path');
@@ -77,7 +78,7 @@ function calculerRang(totalMessages) {
 }
 
 // =============================================
-// 4. RÉSOLUTION DU TARGET (CORRIGÉE)
+// 4. RÉSOLUTION DU TARGET (AMÉLIORÉE)
 // =============================================
 function resolveTarget(msg, args, sender) {
     console.log('🔍 Résolution du target...');
@@ -148,7 +149,68 @@ function resolveTarget(msg, args, sender) {
 }
 
 // =============================================
-// 5. COMMANDE PRINCIPALE .rang (CORRIGÉE)
+// 5. RÉCUPÉRATION DES INFOS CONTACT
+// =============================================
+async function getContactInfo(socket, target, isGroup, groupJid) {
+    const info = {
+        ppUrl: null,
+        statut: 'Non disponible (privé ou non défini)',
+        existeSurWhatsApp: 'Inconnu',
+        nomAffichage: null,
+        roleGroupe: null,
+        numero: target.split('@')[0]
+    };
+
+    // --- Photo de profil ---
+    try {
+        info.ppUrl = await socket.profilePictureUrl(target, 'image');
+        console.log('✅ Photo de profil trouvée');
+    } catch (e) {
+        info.ppUrl = null;
+        console.log('ℹ️ Pas de photo de profil');
+    }
+
+    // --- Statut "à propos" ---
+    try {
+        const infosStatut = await socket.fetchStatus(target);
+        if (infosStatut?.status) {
+            info.statut = infosStatut.status;
+        }
+    } catch (e) {
+        // statut privé ou indisponible
+    }
+
+    // --- Vérification WhatsApp ---
+    try {
+        const resultats = await socket.onWhatsApp(target);
+        if (resultats && resultats.length > 0) {
+            info.existeSurWhatsApp = resultats[0].exists ? '✅ Oui' : '❌ Non';
+        }
+    } catch (e) {
+        // indisponible
+    }
+
+    // --- Rôle dans le groupe ---
+    if (isGroup && groupJid) {
+        try {
+            const groupMeta = await socket.groupMetadata(groupJid);
+            const participant = groupMeta.participants.find(p => p.id === target);
+            if (participant) {
+                info.nomAffichage = participant.name || null;
+                if (participant.admin === 'superadmin') info.roleGroupe = '👑 Créateur';
+                else if (participant.admin === 'admin') info.roleGroupe = '🛡️ Admin';
+                else info.roleGroupe = '👤 Membre';
+            }
+        } catch (e) {
+            console.log('ℹ️ Impossible de récupérer le rôle dans le groupe');
+        }
+    }
+
+    return info;
+}
+
+// =============================================
+// 6. COMMANDE PRINCIPALE .rang (AMÉLIORÉE)
 // =============================================
 async function handleRang(socket, msg, sender, isGroup, nowsender, args, fakevCard) {
     try {
@@ -171,17 +233,18 @@ async function handleRang(socket, msg, sender, isGroup, nowsender, args, fakevCa
 
         // S'assurer que le JID est au bon format
         if (!target.includes('@s.whatsapp.net') && !target.includes('@g.us')) {
-            // Si c'est un numéro seul, ajouter @s.whatsapp.net
             const cleanNumber = target.replace(/[^0-9+]/g, '');
             if (cleanNumber.length >= 8) {
                 target = cleanNumber + '@s.whatsapp.net';
             } else {
-                // Si toujours invalide, utiliser le sender
                 target = sender;
             }
         }
 
         console.log('🎯 Target final:', target);
+
+        // Récupérer les informations du contact
+        const contactInfo = await getContactInfo(socket, target, isGroup, isGroup ? sender : null);
 
         // Récupérer le nombre de messages
         let totalMessages = 0;
@@ -207,33 +270,42 @@ async function handleRang(socket, msg, sender, isGroup, nowsender, args, fakevCa
         const rang = calculerRang(totalMessages);
         
         // Extraire le nom d'utilisateur
-        const username = target.split('@')[0] || 'Utilisateur';
+        const username = contactInfo.numero || target.split('@')[0] || 'Utilisateur';
         const tag = `@${username}`;
 
-        // Construire le message
-        const caption = `╭───「 🏅 *CARTE DE RANG* 」───╮\n` +
-            `│\n` +
-            `│ 👤 *Utilisateur :* ${tag}\n` +
-            `│ 🎖️ *Niveau :* ${rang.niveau}\n` +
-            `│ 🏷️ *Titre :* ${rang.titre}\n` +
-            `│ 💬 *Messages :* ${rang.totalMessages}\n` +
-            `│\n` +
-            `│ 📊 *Progression :*\n` +
-            `│ ${rang.barre} ${rang.messagesDansNiveau}/${MESSAGES_PAR_NIVEAU}\n` +
-            `│ ⏳ ${rang.messagesRestants} msg avant niveau ${rang.niveau + 1}\n` +
-            `│\n` +
-            `╰──────────────────────╯`;
-
-        // Récupérer la photo de profil
-        let ppUrl = 'https://i.imgur.com/2wjP5D9.png'; // Image par défaut
-        try {
-            ppUrl = await socket.profilePictureUrl(target, 'image');
-            console.log('✅ Photo de profil trouvée');
-        } catch (e) {
-            console.log('ℹ️ Pas de photo de profil, utilisation de l\'image par défaut');
+        // Construire le message avec toutes les infos
+        let caption = `╭───「 🏅 *CARTE DE RANG* 」───╮\n`;
+        caption += `│\n`;
+        caption += `│ 👤 *Utilisateur :* ${tag}\n`;
+        
+        if (contactInfo.nomAffichage) {
+            caption += `│ 🏷️ *Nom :* ${contactInfo.nomAffichage}\n`;
         }
+        
+        caption += `│ 📱 *Numéro :* ${contactInfo.numero}\n`;
+        caption += `│ 📶 *WhatsApp :* ${contactInfo.existeSurWhatsApp}\n`;
+        caption += `│ 💬 *À propos :* ${contactInfo.statut}\n`;
+        
+        if (contactInfo.roleGroupe) {
+            caption += `│ 🏅 *Rôle :* ${contactInfo.roleGroupe}\n`;
+        }
+        
+        caption += `│\n`;
+        caption += `│ 🎖️ *Niveau :* ${rang.niveau}\n`;
+        caption += `│ 🏷️ *Titre :* ${rang.titre}\n`;
+        caption += `│ 💬 *Messages :* ${rang.totalMessages}\n`;
+        caption += `│\n`;
+        caption += `│ 📊 *Progression :*\n`;
+        caption += `│ ${rang.barre} ${rang.messagesDansNiveau}/${MESSAGES_PAR_NIVEAU}\n`;
+        caption += `│ ⏳ ${rang.messagesRestants} msg avant niveau ${rang.niveau + 1}\n`;
+        caption += `│\n`;
+        caption += `╰──────────────────────╯\n`;
+        caption += `\nℹ️ _Informations publiquement visibles sur WhatsApp._`;
 
-        // Envoyer le message
+        // Utiliser la photo de profil du contact si disponible
+        let ppUrl = contactInfo.ppUrl || 'https://i.imgur.com/2wjP5D9.png';
+
+        // Envoyer le message avec la photo
         await socket.sendMessage(
             sender, 
             {
@@ -271,7 +343,7 @@ async function handleRang(socket, msg, sender, isGroup, nowsender, args, fakevCa
 }
 
 // =============================================
-// 6. EXPORTS
+// 7. EXPORTS
 // =============================================
 module.exports = { 
     handleRang, 
