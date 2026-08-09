@@ -16,17 +16,6 @@
  */
 
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
-/**
- * Vérifie si un numéro est le propriétaire
- */
-function isOwner(sender, isOwner) {
-    if (!isOwner) return false;
-    const senderClean = sender.split('@')[0].replace(/[^0-9]/g, '');
-    const ownerClean = ownerNumber.split('@')[0].replace(/[^0-9]/g, '');
-    return senderClean === ownerClean;
-}
-
 /**
  * Vérifie si le bot est admin du groupe
  */
