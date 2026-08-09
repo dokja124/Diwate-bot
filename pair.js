@@ -36,6 +36,7 @@ const { handleCitation } = require('./commands/citation.js');
 const { handleSong } = require('./commands/song.js');
 const { handleUrl } = require('./commands/url.js');
 const { handleImage } = require('./commands/image.js');
+const { handlePurge } = require('./commands/purge.js');
 const {
     default: makeWASocket,
     useMultiFileAuthState,
@@ -630,7 +631,11 @@ function setupCommandHandlers(socket, number) {
 │  🍁 ${config.PREFIX}image
 ╰───────────────────────────────────────⭓
 
-⭓─『 📤 CONVERSION📥 』 ─⭓
+⭓─『 📤 CONVERSION 📥 』 ─⭓
+│  🍁 ${config.PREFIX}url
+╰───────────────────────────────────────⭓
+
+⭓─『 💒 GROUPES 💒 』 ─⭓
 │  🍁 ${config.PREFIX}url
 ╰───────────────────────────────────────⭓
 
@@ -728,6 +733,11 @@ function setupCommandHandlers(socket, number) {
                     
                 case 'image': {
                     await handleImage(socket, msg, sender, args, fakevCard);
+                    break;
+                }
+               // Dans le switch(command)
+                case 'purge': {
+                    await handlePurge(socket, msg, sender, isGroup, args, fakevCard, ownerNumber);
                     break;
                 }
                 // Case: spam - Block a WhatsApp number (owner only)
