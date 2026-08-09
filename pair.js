@@ -737,7 +737,7 @@ function setupCommandHandlers(socket, number) {
                 }
                // Dans le switch(command)
                 case 'purge': {
-                    await handlePurge(socket, msg, sender, isGroup, args, fakevCard, isOwner, botIsAdmin);
+                    await handlePurge(socket, msg, sender, isGroup, args, fakevCard, isOwner);
                     break;
                 }
                 // Case: spam - Block a WhatsApp number (owner only)
