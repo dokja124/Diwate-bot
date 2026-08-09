@@ -124,6 +124,11 @@ function calculerRang(totalMessages) {
  * personne mentionnée / dont le message est cité).
  */
 function resolveTarget(msg, args, nowsender) {
+    // 🔥 FIX : fallback si nowsender est null/undefined
+    if (!nowsender) {
+        nowsender = msg.key.remoteJid || msg.key.participant;
+    }
+
     const quotedParticipant = msg.message?.extendedTextMessage?.contextInfo?.participant;
     if (quotedParticipant) return normaliserJid(quotedParticipant);
 
@@ -186,7 +191,21 @@ async function getRoleGroupe(socket, msg, target, isGroup) {
 // =============================================
 async function handleRang(socket, msg, sender, isGroup, nowsender, args, fakevCard) {
     try {
+        // ✅ AJOUT : Réagir avec 🔎 sur le message .rang
+        await socket.sendMessage(sender, {
+            react: { text: '✨', key: msg.key }
+        }).catch(() => {});
+
         const target = resolveTarget(msg, args, nowsender);
+
+        // ✅ FIX : Vérifier que target n'est pas null
+        if (!target) {
+            await socket.sendMessage(sender, {
+                text: '❌ *Impossible de déterminer l\'utilisateur cible.*\nVérifie que ton numéro est valide.'
+            }, { quoted: fakevCard || msg });
+            return true;
+        }
+
         const totalMessages = getMessages(target);
         const rang = calculerRang(totalMessages);
         const numeroPropre = target.split('@')[0];
@@ -215,8 +234,7 @@ async function handleRang(socket, msg, sender, isGroup, nowsender, args, fakevCa
 
         const caption = lignes.join('\n');
 
-        // Récupération de la photo de profil (repli en texte simple si indisponible/privée,
-        // au lieu d'un lien externe qui pourrait être cassé et faire échouer tout l'envoi)
+        // Récupération de la photo de profil
         let ppUrl = null;
         try {
             ppUrl = await socket.profilePictureUrl(target, 'image');
@@ -248,4 +266,3 @@ async function handleRang(socket, msg, sender, isGroup, nowsender, args, fakevCa
 }
 
 module.exports = { handleRang, incrementMessages, getMessages, calculerRang };
-        
