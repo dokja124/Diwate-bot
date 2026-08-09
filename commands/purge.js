@@ -69,7 +69,7 @@ async function kickParticipant(socket, groupId, participantId) {
 // =============================================
 // COMMANDE PRINCIPALE .kickall
 // =============================================
-async function handlePurge(socket, msg, sender, isGroup, args, fakevCard, isOwner) {
+async function handlePurge(socket, msg, sender, isGroup, args, fakevCard, isOwner, botIsAdmin) {
     try {
         // ✅ Réaction
         await socket.sendMessage(sender, { react: { text: '😈', key: msg.key } }).catch(() => {});
