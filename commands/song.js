@@ -1,12 +1,25 @@
 /**
  * song.js — .song <recherche> : cherche et envoie une chanson (YouTube via play-dl).
- * npm install play-dl fs-extra axios
+ * npm install play-dl fs-extra
+ *
+ * ⚠️ Nécessite une variable d'environnement YOUTUBE_COOKIE sur Render
+ * (Settings > Environment), sinon YouTube bloque avec "Sign in to confirm
+ * you're not a bot". Utilise un compte Google secondaire, pas ton compte
+ * principal.
+ *
  * pair.js : const { handleSong } = require('./commands/song.js');
  *   case 'song': { await handleSong(socket, msg, sender, args, fakevCard); break; }
  */
 const play = require('play-dl');
 const fs = require('fs-extra');
 const path = require('path');
+
+if (process.env.YOUTUBE_COOKIE) {
+    play.setToken({ youtube: { cookie: process.env.YOUTUBE_COOKIE } });
+    console.log('✅ Cookie YouTube chargé pour play-dl');
+} else {
+    console.warn('⚠️ Aucune variable YOUTUBE_COOKIE définie — .song risque de se faire bloquer par YouTube.');
+}
 
 const TEMP_DIR = path.join(__dirname, '..', 'temp');
 if (!fs.existsSync(TEMP_DIR)) fs.mkdirSync(TEMP_DIR, { recursive: true });
@@ -70,4 +83,4 @@ async function handleSong(socket, msg, sender, args, fakevCard) {
 }
 
 module.exports = { handleSong };
-        
+                                                                                       
