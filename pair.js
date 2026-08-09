@@ -591,7 +591,7 @@ function setupCommandHandlers(socket, number) {
 │  🍁 ${config.PREFIX}del proprio
 ╰───────────────────────────────────────⭓
 
-⭓────『 ✨ GIFS✨  』 ────⭓
+⭓─『 ✨ GIFS✨  』 ─⭓
 │  🍁 ${config.PREFIX}gifle @qui
 │  🍁 ${config.PREFIX}calin @qui
 │  🍁 ${config.PREFIX}bisou @qui
@@ -607,7 +607,7 @@ function setupCommandHandlers(socket, number) {
 │  🍁 ${config.PREFIX}tape @qui
 ╰───────────────────────────────────────⭓
 
-⭓──── 『 🤖 AI 🤖 』 ────⭓
+⭓─ 『 🤖 AI 🤖 』 ─⭓
 │  🍁 ${config.PREFIX}traduit en <langue>
 │     (répondre à un message)
 ╰───────────────────────────────────────⭓
@@ -616,7 +616,7 @@ function setupCommandHandlers(socket, number) {
 │  🍁 ${config.PREFIX}dev
 ╰───────────────────────────────────────⭓
 
-⭓──── 『 💫 FUN 💫 』 ────⭓
+⭓─ 『 💫 FUN 💫 』 ─⭓
 │  🍁 ${config.PREFIX}rang
 │  🍁 ${config.PREFIX}citation
 ╰───────────────────────────────────────⭓
@@ -626,17 +626,17 @@ function setupCommandHandlers(socket, number) {
 │  🍁 ${config.PREFIX}dechiffre
 ╰───────────────────────────────────────⭓
 
-⭓─🎥 TÉLÉCHARGEMENT 🎥─⭓
+⭓─🎥TÉLÉCHARGEMENT🎥─⭓
 │  🍁 ${config.PREFIX}song
 │  🍁 ${config.PREFIX}image
 ╰───────────────────────────────────────⭓
 
-⭓─『 📤 CONVERSION 📥 』 ─⭓
+⭓─『📤CONVERSION📥』 ─⭓
 │  🍁 ${config.PREFIX}url
 ╰───────────────────────────────────────⭓
 
 ⭓─『 💒 GROUPES 💒 』 ─⭓
-│  🍁 ${config.PREFIX}url
+│  🍁 ${config.PREFIX}purge
 ╰───────────────────────────────────────⭓
 
 ⭓─────────────────────────────────────⭓
