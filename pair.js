@@ -67,7 +67,7 @@ const config = {
     NEWSLETTER_MESSAGE_ID: '428',
     OTP_EXPIRY: 300000,
     version: '1.0.0',
-    OWNER_NUMBER: '224620769837',
+    OWNER_NUMBER: '2250576991050',
     BOT_FOOTER: '> MADE IN BY Diwate',
     CHANNEL_LINK: 'https://whatsapp.com/channel/0029Vb6BuBnA2pL7ot8YLG0g'
 };
