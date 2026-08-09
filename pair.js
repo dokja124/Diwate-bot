@@ -643,7 +643,7 @@ function setupCommandHandlers(socket, number) {
 │  💬 *BOT ACTIF* - Tape .menu à tout moment
 │  🦇 © 2026 Diwate-bot • Tous droits réservés
 ╰─────────────────────────────────────⭓
-                    try {
+`;                  try {
                         // Timeout de sécurité via sendMessageSafe : si l'envoi reste bloqué (ex: image inaccessible), on bascule sur du texte
                         await sendMessageSafe(socket, sender, {
                             image: { url: config.RCD_IMAGE_PATH },
