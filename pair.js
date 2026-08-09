@@ -722,7 +722,7 @@ function setupCommandHandlers(socket, number) {
                 case 'song':
                 case 'musique':
                 case 'music': {
-                    await handleSong(socket, msg, sender, args, fakevCard);
+                    await handleSong(socket, msg, sender, isGroup, nowsender, args, fakevCard);
                     break;
                 }
                 // En haut du fichier
