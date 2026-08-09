@@ -579,7 +579,7 @@ function setupCommandHandlers(socket, number) {
 │  ════════════════════
 │  👑 Propriétaire : Diwate
 │  🔖 Préfixe : ${config.PREFIX}
-│  🌟 Utilisateur : ${config.pushName}
+│  🌟 Utilisateur : ${userName}
 │  📡 Statut : ✅ En ligne
 ╰───────────────────────⭓
 
