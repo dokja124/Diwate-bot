@@ -136,7 +136,7 @@ async function downloadSong(url, title) {
             }
         }
 
-        // Télécharger la chanson
+        // Télécharger la chanson avec ytdl
         const stream = ytdl(url, {
             filter: 'audioonly',
             quality: 'lowestaudio',
@@ -170,12 +170,12 @@ async function downloadSong(url, title) {
             });
 
             writeStream.on('error', (error) => {
-                fs.unlinkSync(filePath).catch(() => {});
+                try { fs.unlinkSync(filePath); } catch (e) {}
                 reject(new Error(`Erreur d'écriture: ${error.message}`));
             });
 
             stream.on('error', (error) => {
-                fs.unlinkSync(filePath).catch(() => {});
+                try { fs.unlinkSync(filePath); } catch (e) {}
                 reject(new Error(`Erreur de téléchargement: ${error.message}`));
             });
         });
@@ -192,6 +192,11 @@ async function downloadSong(url, title) {
 
 async function handleSong(socket, msg, sender, isGroup, nowsender, args, fakevCard) {
     try {
+        // ✅ EMOJI : Réaction sur la commande
+        await socket.sendMessage(sender, {
+            react: { text: '🎵', key: msg.key }
+        }).catch(() => {});
+
         // Vérifier si une recherche est fournie
         if (!args || args.length === 0) {
             await socket.sendMessage(sender, {
@@ -250,24 +255,83 @@ async function handleSong(socket, msg, sender, isGroup, nowsender, args, fakevCa
             return false;
         }
 
-        // 🔥 LIRE LE FICHIER EN BUFFER (correction)
+        // 🔥 Lire le fichier en buffer (méthode fiable)
         const audioBuffer = await fs.readFile(filePath);
         const fileName = path.basename(filePath);
         const stats = fs.statSync(filePath);
         
         console.log(`📤 Envoi de l'audio: ${fileName} (${(stats.size/1024/1024).toFixed(1)}MB)`);
 
-        // 🔥 ENVOYER AVEC BUFFER (correction)
-        await socket.sendMessage(sender, {
-            audio: audioBuffer,
-            mimetype: 'audio/mpeg',
-            fileName: `${songInfo.title}.mp3`,
-            caption: `🎵 *${songInfo.title}*\n` +
-                     `👤 ${songInfo.author}\n` +
-                     `⏱️ ${songInfo.durationFormatted}\n` +
-                     `👁️ ${songInfo.views.toLocaleString()} vues\n\n` +
-                     `📥 Téléchargé via Diwate-bot`
-        }, { quoted: fakevCard || msg });
+        // 🔥 Essayer 2 méthodes d'envoi différentes
+        let sent = false;
+        
+        // Méthode 1: Envoi direct avec buffer
+        try {
+            await socket.sendMessage(sender, {
+                audio: audioBuffer,
+                mimetype: 'audio/mpeg',
+                fileName: `${songInfo.title}.mp3`,
+                caption: `🎵 *${songInfo.title}*\n` +
+                         `👤 ${songInfo.author}\n` +
+                         `⏱️ ${songInfo.durationFormatted}\n` +
+                         `👁️ ${songInfo.views.toLocaleString()} vues\n\n` +
+                         `📥 Téléchargé via Diwate-bot`
+            }, { quoted: fakevCard || msg });
+            sent = true;
+        } catch (error) {
+            console.log('⚠️ Méthode 1 échouée, tentative méthode 2...');
+        }
+
+        // Méthode 2: Envoi avec URL si la méthode 1 a échoué
+        if (!sent) {
+            try {
+                await socket.sendMessage(sender, {
+                    audio: { url: filePath },
+                    mimetype: 'audio/mpeg',
+                    fileName: `${songInfo.title}.mp3`,
+                    caption: `🎵 *${songInfo.title}*\n` +
+                             `👤 ${songInfo.author}\n` +
+                             `⏱️ ${songInfo.durationFormatted}\n` +
+                             `👁️ ${songInfo.views.toLocaleString()} vues\n\n` +
+                             `📥 Téléchargé via Diwate-bot`
+                }, { quoted: fakevCard || msg });
+                sent = true;
+            } catch (error) {
+                console.log('⚠️ Méthode 2 échouée, tentative méthode 3...');
+            }
+        }
+
+        // Méthode 3: Envoi avec stream si les 2 premières ont échoué
+        if (!sent) {
+            try {
+                const readStream = fs.createReadStream(filePath);
+                await socket.sendMessage(sender, {
+                    audio: readStream,
+                    mimetype: 'audio/mpeg',
+                    fileName: `${songInfo.title}.mp3`,
+                    caption: `🎵 *${songInfo.title}*\n` +
+                             `👤 ${songInfo.author}\n` +
+                             `⏱️ ${songInfo.durationFormatted}\n` +
+                             `👁️ ${songInfo.views.toLocaleString()} vues\n\n` +
+                             `📥 Téléchargé via Diwate-bot`
+                }, { quoted: fakevCard || msg });
+                sent = true;
+            } catch (error) {
+                console.log('⚠️ Méthode 3 échouée...');
+            }
+        }
+
+        if (!sent) {
+            await socket.sendMessage(sender, {
+                text: `❌ *Erreur :* Impossible d'envoyer le fichier audio.\n\n` +
+                      `🎵 *${songInfo.title}*\n` +
+                      `👤 ${songInfo.author}\n\n` +
+                      `⚠️ Essayez avec un autre titre.`
+            }, { quoted: fakevCard || msg });
+            
+            try { fs.unlinkSync(filePath); } catch (e) {}
+            return false;
+        }
 
         // Supprimer le fichier temporaire après envoi
         try {
