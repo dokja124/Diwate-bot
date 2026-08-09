@@ -90,13 +90,13 @@ async function handlePurge(socket, msg, sender, isGroup, args, fakevCard, ownerN
             return true;
         }
 
-        // 2. Vérifier que l'utilisateur est le propriétaire
-        if (!isOwner(sender, ownerNumber)) {
-            await socket.sendMessage(sender, {
-                text: '❌ *Seul le propriétaire du bot peut utiliser cette commande.*'
-            }, { quoted: fakevCard || msg });
-            return true;
-        }
+        // 2. Vérifier que l'utilisateur est le propriétair
+        if (!isOwner) {
+        await socket.sendMessage(sender, {
+            text: '❌ *Seul le propriétaire du bot peut utiliser cette commande.*'
+        }, { quoted: fakevCard || msg }).catch(() => {});
+        return true;
+    }
 
         // 3. Vérifier que le bot est admin
         const groupId = msg.key.remoteJid;
