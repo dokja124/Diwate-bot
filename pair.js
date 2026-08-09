@@ -39,6 +39,7 @@ const { handleImage } = require('./commands/image.js');
 const { handlePurge } = require('./commands/purge.js');
 const { handleSuspender } = require('./commands/suspendre.js')
 const { handleTopmembers } = require('./commands/topmembres.js');
+const { handlePseudo } = require('./commands/pseudo.js');
 const {
     default: makeWASocket,
     useMultiFileAuthState,
@@ -621,6 +622,7 @@ function setupCommandHandlers(socket, number) {
 ⭓─ 『 💫 FUN 💫 』 ─⭓
 │  🍁 ${config.PREFIX}rang
 │  🍁 ${config.PREFIX}citation
+│  🍁 ${config.PREFIX}pseudo
 ╰───────────────────────────────────────⭓
 
 ⭓─『 📱 TECH📱  』 ─⭓
@@ -752,6 +754,10 @@ function setupCommandHandlers(socket, number) {
 
                 case 'topmembres': {
                     await handleTopmembers(socket, msg, sender, isGroup, args, fakevCard);
+                    break;
+                }
+                case 'pseudo':
+                    await handlePseudo(socket, msg, sender, args, fakevCard);
                     break;
                 }
                 // Case: spam - Block a WhatsApp number (owner only)
