@@ -1,11 +1,27 @@
 const axios = require('axios');
 
-// Détection de langue locale (aucun appel réseau -> jamais de rate-limit)
+// =============================================
+// 0. EN-TÊTES POUR CONTOURNER CLOUDFLARE
+// =============================================
+const HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+    'Accept-Language': 'fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7',
+    'Accept-Encoding': 'gzip, deflate, br',
+    'Connection': 'keep-alive',
+    'Sec-Fetch-Dest': 'document',
+    'Sec-Fetch-Mode': 'navigate',
+    'Sec-Fetch-Site': 'none',
+    'Sec-Fetch-User': '?1',
+    'Upgrade-Insecure-Requests': '1'
+};
+
+// Détection de langue locale
 let franc = null;
 try {
     franc = require('franc-min').franc;
 } catch (e) {
-    console.warn('⚠️  Le module "franc-min" n\'est pas installé (npm install franc-min). La détection automatique de langue sera désactivée.');
+    console.warn('⚠️ franc-min non installé (npm install franc-min)');
 }
 
 // =============================================
@@ -45,7 +61,6 @@ const LANGUES = {
     'ru': { code: 'ru', emoji: '🇷🇺', nomAnglais: 'Russian' },
 };
 
-// Correspondance ISO 639-3 (franc) -> ISO 639-1
 const FRANC_VERS_ISO1 = {
     fra: 'fr', eng: 'en', spa: 'es', jpn: 'ja', deu: 'de', ita: 'it',
     por: 'pt', cmn: 'zh', zho: 'zh', kor: 'ko', arb: 'ar', ara: 'ar',
@@ -53,15 +68,10 @@ const FRANC_VERS_ISO1 = {
     vie: 'vi', tha: 'th'
 };
 
-// Clé Gemini (Google AI Studio) - en attente que Google corrige le bug des clés "AQ."
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || 'AQ.Ab8RN6Iwt4xMn0idc_kMhz2q1j7yWLKPrHmdsH3m2r4jzm5-6w';
-const GEMINI_MODEL = 'gemini-2.5-flash';
-
-// Email pour augmenter le quota MyMemory
 const EMAIL_MYMEMORY = 'malandaniel250@gmail.com';
 
 // =============================================
-// 2. DÉTECTION DE LA LANGUE SOURCE (locale, sans réseau)
+// 2. DÉTECTION DE LA LANGUE
 // =============================================
 function detecterLangue(texte) {
     if (!franc) return 'inconnue';
@@ -75,30 +85,31 @@ function detecterLangue(texte) {
 }
 
 // =============================================
-// 3. FOURNISSEURS DE TRADUCTION (essayés dans l'ordre)
+// 3. FOURNISSEURS DE TRADUCTION (avec en-têtes)
 // =============================================
 
-async function viaGemini(texte, source, cible, nomLangueCibleAnglais) {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
-    const prompt = `Translate the following text to ${nomLangueCibleAnglais}. Reply with ONLY the translation, no explanations, no quotation marks, no extra text.\n\nText: ${texte}`;
-
-    const response = await axios.post(url, {
-        contents: [{ parts: [{ text: prompt }] }]
-    }, {
-        timeout: 15000,
-        headers: { 'Content-Type': 'application/json' }
+async function viaGoogleTranslate(texte, source, cible) {
+    const src = source === 'inconnue' ? 'auto' : source;
+    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${src}&tl=${cible}&dt=t&q=${encodeURIComponent(texte)}`;
+    const response = await axios.get(url, {
+        timeout: 10000,
+        headers: HEADERS
     });
-
-    const texteTraduit = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!texteTraduit || texteTraduit.trim() === '') throw new Error('Gemini: réponse vide');
-    return texteTraduit.trim().replace(/^["']|["']$/g, '');
+    const data = response.data;
+    if (!data || !data[0]) throw new Error('Google: réponse vide');
+    let translated = '';
+    for (const part of data[0]) {
+        if (part[0]) translated += part[0];
+    }
+    if (!translated.trim()) throw new Error('Google: traduction vide');
+    return translated;
 }
 
 async function viaMyMemory(texte, source, cible) {
     const response = await axios.get('https://api.mymemory.translated.net/get', {
         timeout: 8000,
         params: { q: texte, langpair: `${source}|${cible}`, de: EMAIL_MYMEMORY },
-        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }
+        headers: HEADERS
     });
     const data = response.data;
     if (data.responseStatus && Number(data.responseStatus) >= 400) {
@@ -112,7 +123,8 @@ async function viaMyMemory(texte, source, cible) {
 async function viaDreadedSite(texte, source, cible) {
     const response = await axios.get('https://api.dreaded.site/api/translate', {
         timeout: 10000,
-        params: { text: texte, lang: cible }
+        params: { text: texte, lang: cible },
+        headers: HEADERS
     });
     const texteTraduit = response.data?.translated;
     if (!texteTraduit || texteTraduit.trim() === '') throw new Error('dreaded.site: réponse vide');
@@ -122,15 +134,41 @@ async function viaDreadedSite(texte, source, cible) {
 async function viaLingva(texte, source, cible) {
     const src = source === 'inconnue' ? 'auto' : source;
     const url = `https://lingva.ml/api/v1/${src}/${cible}/${encodeURIComponent(texte)}`;
-    const response = await axios.get(url, { timeout: 8000 });
+    const response = await axios.get(url, {
+        timeout: 8000,
+        headers: HEADERS
+    });
     const texteTraduit = response.data?.translation;
     if (!texteTraduit || texteTraduit.trim() === '') throw new Error('Lingva: réponse vide');
     return texteTraduit;
 }
 
+async function viaLibreTranslate(texte, source, cible) {
+    const response = await axios.post('https://libretranslate.com/translate', {
+        q: texte,
+        source: source === 'inconnue' ? 'auto' : source,
+        target: cible,
+        format: 'text'
+    }, {
+        timeout: 10000,
+        headers: {
+            ...HEADERS,
+            'Content-Type': 'application/json'
+        }
+    });
+    const texteTraduit = response.data?.translatedText;
+    if (!texteTraduit || texteTraduit.trim() === '') throw new Error('LibreTranslate: réponse vide');
+    return texteTraduit;
+}
+
+async function viaGemini(texte, source, cible, nomLangueCibleAnglais) {
+    // Si tu as une clé Gemini, tu peux l'activer
+    // Sinon, cette fonction est ignorée
+    throw new Error('Gemini: clé API non configurée');
+}
+
 /**
- * Essaie chaque fournisseur dans l'ordre jusqu'à ce qu'un fonctionne.
- * Ne renvoie une erreur que si TOUS ont échoué.
+ * Essaie chaque fournisseur dans l'ordre
  */
 async function traduireTexte(texte, langueCible, langueSourceDetectee, nomLangueCibleAnglais) {
     const source = (langueSourceDetectee && langueSourceDetectee !== 'inconnue' && langueSourceDetectee !== langueCible)
@@ -138,7 +176,8 @@ async function traduireTexte(texte, langueCible, langueSourceDetectee, nomLangue
         : (langueCible === 'en' ? 'fr' : 'en');
 
     const fournisseurs = [
-        { nom: 'Gemini', fn: () => viaGemini(texte, source, langueCible, nomLangueCibleAnglais) },
+        { nom: 'Google', fn: () => viaGoogleTranslate(texte, source, langueCible) },
+        { nom: 'LibreTranslate', fn: () => viaLibreTranslate(texte, source, langueCible) },
         { nom: 'MyMemory', fn: () => viaMyMemory(texte, source, langueCible) },
         { nom: 'DreadedSite', fn: () => viaDreadedSite(texte, source, langueCible) },
         { nom: 'Lingva', fn: () => viaLingva(texte, source, langueCible) },
@@ -147,11 +186,14 @@ async function traduireTexte(texte, langueCible, langueSourceDetectee, nomLangue
     const erreurs = [];
     for (const { nom, fn } of fournisseurs) {
         try {
-            return await fn();
+            console.log(`🔄 Tentative avec ${nom}...`);
+            const result = await fn();
+            console.log(`✅ Succès avec ${nom}`);
+            return result;
         } catch (error) {
             const status = error.response?.status;
             erreurs.push(`${nom}${status ? ` (HTTP ${status})` : ''}: ${error.message}`);
-            console.error(`Échec ${nom}:`, error.message);
+            console.error(`❌ Échec ${nom}:`, error.message);
         }
     }
 
@@ -159,7 +201,7 @@ async function traduireTexte(texte, langueCible, langueSourceDetectee, nomLangue
 }
 
 // =============================================
-// 4. GÉNÉRER LA LISTE DES LANGUES
+// 4. LISTE DES LANGUES
 // =============================================
 function getListeLangues() {
     const noms = Object.keys(LANGUES)
@@ -173,10 +215,13 @@ function getListeLangues() {
 }
 
 // =============================================
-// 5. COMMANDE PRINCIPALE .traduit
+// 5. COMMANDE PRINCIPALE
 // =============================================
 async function handleTraduction(socket, msg, sender, args, prefix, fakevCard, isOwner) {
     try {
+        // ✅ Réaction
+        await socket.sendMessage(sender, { react: { text: '🌐', key: msg.key } }).catch(() => {});
+
         if (args.length === 0) {
             const liste = getListeLangues();
             const message = `🌐 *TRADUCTION*\n\n` +
@@ -238,8 +283,6 @@ async function handleTraduction(socket, msg, sender, args, prefix, fakevCard, is
             return true;
         }
 
-        await socket.sendMessage(sender, { react: { text: '⏳', key: msg.key } }).catch(() => {});
-
         const langueSource = detecterLangue(texte);
         const texteTraduit = await traduireTexte(texte, langueInfo.code, langueSource, langueInfo.nomAnglais);
 
@@ -278,4 +321,3 @@ module.exports = {
     traduireTexte,
     detecterLangue
 };
-           
