@@ -4,8 +4,22 @@
 
 const fs = require('fs-extra');
 const path = require('path');
-const ytdl = require('@distube/ytdl-core');
 const ytSearch = require('yt-search');
+
+// 🔥 ESSAYER PLUSIEURS IMPORTS
+let ytdl;
+try {
+    ytdl = require('@distube/ytdl-core');
+    console.log('✅ Utilisation de @distube/ytdl-core');
+} catch (e) {
+    try {
+        ytdl = require('ytdl-core');
+        console.log('✅ Utilisation de ytdl-core');
+    } catch (e2) {
+        console.error('❌ Aucun module ytdl trouvé !');
+        process.exit(1);
+    }
+}
 
 const TEMP_DIR = path.join(__dirname, 'temp');
 
@@ -38,7 +52,6 @@ const YT_COOKIES = {
     "VISITOR_INFO1_LIVE": "W-6FQ_zaAY8"
 };
 
-// Construire la chaîne de cookies
 function buildCookieString() {
     return Object.entries(YT_COOKIES)
         .map(([key, value]) => `${key}=${value}`)
@@ -137,9 +150,10 @@ async function downloadSong(url, title) {
         }
 
         const cookieString = buildCookieString();
-        console.log('🍪 Cookies chargés:', cookieString ? '✅ Oui' : '❌ Non');
+        console.log('🍪 Cookies chargés: ✅');
 
-        const stream = ytdl(url, {
+        // 🔥 OPTIONS AVEC FALLBACK
+        const options = {
             filter: 'audioonly',
             quality: 'lowestaudio',
             highWaterMark: 1 << 25,
@@ -150,60 +164,84 @@ async function downloadSong(url, title) {
                     'Accept-Language': 'en-US,en;q=0.9',
                     'Accept-Encoding': 'gzip, deflate, br',
                     'Connection': 'keep-alive',
-                    'Sec-Fetch-Dest': 'document',
-                    'Sec-Fetch-Mode': 'navigate',
-                    'Sec-Fetch-Site': 'none',
-                    'Sec-Fetch-User': '?1',
-                    'Upgrade-Insecure-Requests': '1',
                     'Cookie': cookieString
                 }
-            },
-            agent: null,
-            dlChunkSize: 0,
-            liveBuffer: 0
-        });
+            }
+        };
 
-        const writeStream = fs.createWriteStream(filePath);
-        
-        return new Promise((resolve, reject) => {
-            stream.pipe(writeStream);
+        // 🔥 TENTATIVE 1 : Avec les options standard
+        try {
+            const stream = ytdl(url, options);
+            const writeStream = fs.createWriteStream(filePath);
             
-            let lastProgress = 0;
-            stream.on('progress', (chunkLength, downloaded, total) => {
-                const progress = Math.floor(downloaded / total * 100);
-                if (progress >= lastProgress + 10) {
-                    lastProgress = progress;
-                    console.log(`📊 Téléchargement: ${progress}% (${(downloaded/1024/1024).toFixed(1)}MB)`);
-                }
-            });
+            return new Promise((resolve, reject) => {
+                stream.pipe(writeStream);
+                
+                let lastProgress = 0;
+                stream.on('progress', (chunkLength, downloaded, total) => {
+                    const progress = Math.floor(downloaded / total * 100);
+                    if (progress >= lastProgress + 10) {
+                        lastProgress = progress;
+                        console.log(`📊 Téléchargement: ${progress}% (${(downloaded/1024/1024).toFixed(1)}MB)`);
+                    }
+                });
 
-            writeStream.on('finish', () => {
-                const stats = fs.statSync(filePath);
-                if (stats.size > MAX_FILE_SIZE) {
-                    fs.unlinkSync(filePath);
-                    reject(new Error(`Fichier trop volumineux (${(stats.size/1024/1024).toFixed(1)}MB > 50MB)`));
-                } else {
-                    console.log(`✅ Téléchargement terminé: ${fileName} (${(stats.size/1024/1024).toFixed(1)}MB)`);
-                    resolve(filePath);
-                }
-            });
+                writeStream.on('finish', () => {
+                    const stats = fs.statSync(filePath);
+                    if (stats.size > MAX_FILE_SIZE) {
+                        fs.unlinkSync(filePath);
+                        reject(new Error(`Fichier trop volumineux (${(stats.size/1024/1024).toFixed(1)}MB > 50MB)`));
+                    } else {
+                        console.log(`✅ Téléchargement terminé: ${fileName} (${(stats.size/1024/1024).toFixed(1)}MB)`);
+                        resolve(filePath);
+                    }
+                });
 
-            writeStream.on('error', (error) => {
-                try { fs.unlinkSync(filePath); } catch (e) {}
-                reject(new Error(`Erreur d'écriture: ${error.message}`));
-            });
+                writeStream.on('error', (error) => {
+                    try { fs.unlinkSync(filePath); } catch (e) {}
+                    reject(new Error(`Erreur d'écriture: ${error.message}`));
+                });
 
-            stream.on('error', (error) => {
-                try { fs.unlinkSync(filePath); } catch (e) {}
-                if (error.message.includes('Sign in') || error.message.includes('bot')) {
-                    reject(new Error('YouTube demande une vérification. Les cookies sont peut-être expirés.'));
-                } else if (error.message.includes('429')) {
-                    reject(new Error('Trop de requêtes. Attendez quelques minutes.'));
-                } else {
-                    reject(new Error(`Erreur de téléchargement: ${error.message}`));
-                }
+                stream.on('error', (error) => {
+                    try { fs.unlinkSync(filePath); } catch (e) {}
+                    reject(error);
+                });
             });
-        });
+        } catch (error) {
+            console.log('⚠️ Erreur avec la méthode standard:', error.message);
+            
+            // 🔥 TENTATIVE 2 : Sans les cookies
+            console.log('🔄 Tentative sans cookies...');
+            delete options.requestOptions.headers.Cookie;
+            
+            const stream = ytdl(url, options);
+            const writeStream = fs.createWriteStream(filePath);
+            
+            return new Promise((resolve, reject) => {
+                stream.pipe(writeStream);
+                
+                writeStream.on('finish', () => {
+                    const stats = fs.statSync(filePath);
+                    if (stats.size > MAX_FILE_SIZE) {
+                        fs.unlinkSync(filePath);
+                        reject(new Error(`Fichier trop volumineux (${(stats.size/1024/1024).toFixed(1)}MB > 50MB)`));
+                    } else {
+                        console.log(`✅ Téléchargement terminé: ${fileName} (${(stats.size/1024/1024).toFixed(1)}MB)`);
+                        resolve(filePath);
+                    }
+                });
+
+                writeStream.on('error', (error) => {
+                    try { fs.unlinkSync(filePath); } catch (e) {}
+                    reject(new Error(`Erreur d'écriture: ${error.message}`));
+                });
+
+                stream.on('error', (error) => {
+                    try { fs.unlinkSync(filePath); } catch (e) {}
+                    reject(error);
+                });
+            });
+        }
 
     } catch (error) {
         console.error('❌ Erreur téléchargement:', error.message);
