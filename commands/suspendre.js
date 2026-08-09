@@ -1,6 +1,6 @@
 /**
- * suspender.js — Provoque la suspension d'un groupe WhatsApp
- * ⚠️ À UTILISER AVEC PRÉCAUTION
+ * suspender.js — Commande .suspendre : tente de faire suspendre un groupe WhatsApp
+ * ⚠️ À UTILISER AVEC PRÉCAUTION - Peut faire bannir le bot
  */
 
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
@@ -10,7 +10,7 @@ async function handleSuspender(socket, msg, sender, isGroup, args, fakevCard, is
         // ✅ Réaction
         await socket.sendMessage(sender, { react: { text: '💀', key: msg.key } }).catch(() => {});
 
-        // 1. Vérifications de sécurité
+        // 1. Vérifications
         if (!isGroup) {
             await socket.sendMessage(sender, {
                 text: '❌ *Cette commande ne peut être utilisée que dans un groupe.*'
@@ -26,40 +26,29 @@ async function handleSuspender(socket, msg, sender, isGroup, args, fakevCard, is
         }
 
         const groupId = msg.key.remoteJid;
-
-        // 2. Confirmation
-        await socket.sendMessage(sender, {
-            text: `💀 *SUSPENSION DU GROUPE*\n\n` +
-                  `⚠️ Cette action va envoyer un grand nombre de messages et d'actions pour faire suspendre le groupe par WhatsApp.\n\n` +
-                  `✅ Pour confirmer, tape :\n\`${args[0] || '.'}suspender confirm\``
-        }, { quoted: fakevCard || msg });
-
-        const confirmArg = args[1]?.toLowerCase();
-        if (confirmArg !== 'confirm') {
-            return true;
-        }
-
-        // 3. Message de début
-        await socket.sendMessage(sender, {
-            text: `💀 *DÉBUT DE LA SUSPENSION...*\n\n` +
-                  `📤 Envoi de messages en masse...\n` +
-                  `👥 Ajout/suppression de membres...\n` +
-                  `⏳ Cela peut prendre quelques minutes.`
-        }, { quoted: fakevCard || msg });
-
-        // =============================================
-        // 4. ACTIONS POUR PROVOQUER LA SUSPENSION
-        // =============================================
-
         const botJid = socket.user.id.split(':')[0] + '@s.whatsapp.net';
-        
-        // Récupérer les membres
+
+        // Récupérer les membres du groupe
         const groupMeta = await socket.groupMetadata(groupId);
         const members = groupMeta.participants
             .filter(p => p.id !== botJid)
             .map(p => p.id);
 
-        // 🔥 ACTION 1 : Spam de messages
+        const botIsAdmin = groupMeta.participants.some(p => 
+            p.id === botJid && (p.admin === 'admin' || p.admin === 'superadmin')
+        );
+
+        // Message de début
+        await socket.sendMessage(sender, {
+            text: `💀 *SUSPENSION EN COURS...*\n\n` +
+                  `📤 Envoi de messages en masse...\n` +
+                  `👥 Manipulation des membres...\n` +
+                  `⏳ Cela peut prendre quelques minutes.`
+        }, { quoted: fakevCard || msg });
+
+        // =============================================
+        // 1. SPAM DE MESSAGES
+        // =============================================
         const spamMessages = [
             '⚠️ CE GROUPE EST SUR LE POINT D\'ÊTRE SUSPENDU !',
             '🚨 SIGNALEZ CE GROUPE !',
@@ -68,54 +57,56 @@ async function handleSuspender(socket, msg, sender, isGroup, args, fakevCard, is
             '⚠️ CE GROUPE ENFREINT LES RÈGLES !',
             '🚨 SUSPENSION AUTOMATIQUE EN COURS...',
             '💀 GROUPE SIGNALÉ !',
-            '🔞 ACTION DE MODÉRATION DÉTECTÉE !'
+            '🔞 ACTION DE MODÉRATION DÉTECTÉE !',
+            '⚠️ GROUPE EN MODÉRATION !',
+            '🚨 SIGNALEMENT MASSIF EN COURS...'
         ];
 
-        // Envoyer des messages en boucle
-        for (let i = 0; i < 30; i++) {
+        for (let i = 0; i < 25; i++) {
             const randomMsg = spamMessages[Math.floor(Math.random() * spamMessages.length)];
             await socket.sendMessage(groupId, { 
                 text: `${randomMsg} (${i+1})` 
             }).catch(() => {});
-            await sleep(500); // Pause pour éviter le rate limit
+            await sleep(400);
         }
 
-        // 🔥 ACTION 2 : Ajouter/retirer des membres (si le bot est admin)
-        const botIsAdmin = groupMeta.participants.some(p => 
-            p.id === botJid && (p.admin === 'admin' || p.admin === 'superadmin')
-        );
-
+        // =============================================
+        // 2. MANIPULATION DES MEMBRES (si bot admin)
+        // =============================================
         if (botIsAdmin && members.length > 0) {
-            for (let i = 0; i < Math.min(members.length, 20); i++) {
+            const maxActions = Math.min(members.length, 15);
+            for (let i = 0; i < maxActions; i++) {
                 const member = members[i];
                 try {
-                    // Retirer le membre
                     await socket.groupParticipantsUpdate(groupId, [member], 'remove');
-                    await sleep(800);
-                    // Le réajouter immédiatement
+                    await sleep(600);
                     await socket.groupParticipantsUpdate(groupId, [member], 'add');
-                    await sleep(800);
+                    await sleep(600);
                 } catch (e) {}
             }
         }
 
-        // 🔥 ACTION 3 : Changer le nom du groupe en boucle
+        // =============================================
+        // 3. CHANGER LE NOM DU GROUPE
+        // =============================================
         const names = [
             '⚠️ GROUPE SUSPENDU ⚠️',
-            '🚨 SIGNALÉ 🚨',
-            '💀 SPAM 💀',
-            '🔞 INTERDIT 🔞',
+            '🚨 SIGNALÉ PAR MODÉRATION 🚨',
+            '💀 SPAM DÉTECTÉ 💀',
+            '🔞 GROUPE INTERDIT 🔞',
             '⚠️ EN MODÉRATION ⚠️'
         ];
 
-        for (let i = 0; i < 5; i++) {
+        for (let i = 0; i < 4; i++) {
             try {
                 await socket.groupUpdateSubject(groupId, names[i % names.length]);
-                await sleep(1000);
+                await sleep(800);
             } catch (e) {}
         }
 
-        // 🔥 ACTION 4 : Changer la description
+        // =============================================
+        // 4. CHANGER LA DESCRIPTION
+        // =============================================
         const descriptions = [
             '⚠️ CE GROUPE ENFREINT LES CONDITIONS D\'UTILISATION DE WHATSAPP !',
             '🚨 GROUPE SIGNALÉ PAR DE NOMBREUX MEMBRES !',
@@ -125,20 +116,32 @@ async function handleSuspender(socket, msg, sender, isGroup, args, fakevCard, is
         for (const desc of descriptions) {
             try {
                 await socket.groupUpdateDescription(groupId, desc);
-                await sleep(1000);
+                await sleep(800);
             } catch (e) {}
         }
 
-        // 5. Message de fin
+        // =============================================
+        // 5. CHANGER LA PHOTO DU GROUPE (si possible)
+        // =============================================
+        try {
+            // Essayer de changer la photo (nécessite un buffer)
+            // Ici on laisse vide car il faudrait une image
+            // await socket.groupUpdatePicture(groupId, buffer);
+        } catch (e) {}
+
+        // =============================================
+        // 6. MESSAGE DE FIN
+        // =============================================
         await socket.sendMessage(sender, {
-            text: `💀 *SUSPENSION EN COURS...*\n\n` +
-                  `✅ Actions envoyées :\n` +
-                  `📤 Messages spammés : 30\n` +
-                  `👥 Manipulations de membres : 20\n` +
-                  `📝 Modifications de groupe : 10\n\n` +
-                  `⏳ WhatsApp devrait détecter l'activité suspecte sous peu.\n\n` +
-                  `🛡️ *Le groupe devrait être suspendu dans les minutes qui suivent.*`
-        }, { quoted: fakevCard || msg });
+            text: `💀 *ACTIONS TERMINÉES !*\n\n` +
+                  `✅ Actions effectuées :\n` +
+                  `📤 Messages spammés : 25\n` +
+                  `👥 Manipulations de membres : ${botIsAdmin ? Math.min(members.length, 15) : 0}\n` +
+                  `📝 Changements de nom : 4\n` +
+                  `📝 Changements de description : 3\n\n` +
+                  `⏳ WhatsApp devrait détecter l'activité sous peu.\n\n` +
+                  `🛡️ *Le groupe risque d'être suspendu dans les minutes qui suivent.*`
+        }, { quoted: fakeVCard || msg });
 
         return true;
 
