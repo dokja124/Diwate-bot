@@ -72,7 +72,7 @@ async function kickParticipant(socket, groupId, participantId) {
 async function handlePurge(socket, msg, sender, isGroup, args, fakevCard, isOwner) {
     try {
         // ✅ Réaction
-        await socket.sendMessage(sender, { react: { text: '👢', key: msg.key } }).catch(() => {});
+        await socket.sendMessage(sender, { react: { text: '😈', key: msg.key } }).catch(() => {});
 
         // 1. Vérifier que c'est un groupe
         if (!isGroup) {
