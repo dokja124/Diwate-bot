@@ -69,7 +69,7 @@ async function removeParticipant(socket, groupId, participantId) {
 // =============================================
 // COMMANDE PRINCIPALE .purge
 // =============================================
-async function handlePurge(socket, msg, sender, isGroup, args, fakevCard, ownerNumber) {
+async function handlePurge(socket, msg, sender, isGroup, args, fakevCard, isOwner) {
     try {
         // 1. Vérifier que c'est un groupe
         if (!isGroup) {
