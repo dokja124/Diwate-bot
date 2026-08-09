@@ -225,7 +225,7 @@ async function handleRang(socket, msg, sender, isGroup, nowsender, args, fakevCa
         }
 
         if (ppUrl) {
-            await socket.sendMessage(sender,{ react: { text: '✨', key: msg.key } }).catch(() => {}); {
+            await socket.sendMessage(sender, {
                 image: { url: ppUrl },
                 caption,
                 mentions: [target]
