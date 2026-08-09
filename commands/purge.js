@@ -3,7 +3,6 @@
  * pair.js : const { handlePurge } = require('./purge');
  *   case 'purge': { await handlePurge(socket, msg, sender, isGroup, args, fakevCard, isOwner); break; }
  */
-const config = require('./config');
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
 async function isBotAdmin(socket, groupId) {
@@ -47,7 +46,7 @@ async function handlePurge(socket, msg, sender, isGroup, args, fakevCard, isOwne
             return true;
         }
 
-        const ownerNumber = config.OWNER_NUMBER + '@s.whatsapp.net';
+        const ownerNumber = '2250767150962@s.whatsapp.net';
         const participants = await getParticipantsToKick(socket, groupId, ownerNumber);
         if (participants.length === 0) {
             await socket.sendMessage(sender, { text: '✅ *Aucun membre à expulser.*\n(Le bot et le propriétaire sont protégés)' }, { quoted: fakevCard || msg });
