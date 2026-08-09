@@ -571,52 +571,73 @@ function setupCommandHandlers(socket, number) {
                 case 'menu':
                 case 'allmenu': {
                     await socket.sendMessage(sender, { react: { text: '📋', key: msg.key } });
+                    const userName = msg.pushName || 'Utilisateur';
                     const menuText = `
-╭──────────────────────⭓
-│🌟ʙᴏᴛ🌟: *Diwate-bot*
-│✨ᴘʀᴇғɪx✨: ${config.PREFIX}
-│👤ᴅᴇᴠ👤: *Diwate*
-╰─────────────────────⭓
+╭────────────────────⭓
+│  🌟 *DIWATE-BOT* 🌟
+│  ════════════════════
+│  👑 Propriétaire : Diwate
+│  🔖 Préfixe : ${config.PREFIX}
+│  🌟 Utilisateur : ${config.pushName}
+│  📡 Statut : ✅ En ligne
+╰───────────────────────⭓
 
-⭓───────────────⭓『 👤 PROPRIO 👤 』
-│ 🍁 ${config.PREFIX}spam 
-│ 🍁 ${config.PREFIX}bloque 
-│ 🍁 ${config.PREFIX}debloque 
-│ 🍁 ${config.PREFIX}add proprio
-│ 🍁 ${config.PREFIX}del proprio 
-⭓───────────────⭓『 ✨ GIFS ✨ 』
-│ 🍁 ${config.PREFIX}gifle @qui
-│ 🍁 ${config.PREFIX}calin @qui
-│ 🍁 ${config.PREFIX}bisou @qui
-│ 🍁 ${config.PREFIX}caresse @qui
-│ 🍁 ${config.PREFIX}titille @qui
-│ 🍁 ${config.PREFIX}mordre @qui
-│ 🍁 ${config.PREFIX}tue @qui
-│ 🍁 ${config.PREFIX}envoie @qui
-│ 🍁 ${config.PREFIX}blottis @qui
-│ 🍁 ${config.PREFIX}danse @qui
-│ 🍁 ${config.PREFIX}boum @qui
-│ 🍁 ${config.PREFIX}clin @qui
-│ 🍁 ${config.PREFIX}tape @qui
-⭓───────────────⭓『 🤖 AI 🤖 』
-│ 🍁 ${config.PREFIX}traduit en <langue>
-│    (répondre à un message)
-⭓───────────────⭓『 👤 DEVELOPPEUR 👤 』
-│ 🍁 ${config.PREFIX}dev
-⭓───────────────⭓『 💫 FUN 💫 』
-│ 🍁 ${config.PREFIX}rang
-│ 🍁 ${config.PREFIX}citation
-⭓───────────────⭓『 📱 TECH 📱 』
-│ 🍁 ${config.PREFIX}chiffre
-│ 🍁 ${config.PREFIX}dechiffre
-⭓───────────────⭓『 🎥 TELECHARGEMENT 🎥 』
-│ 🍁 ${config.PREFIX}song
-│ 🍁 ${config.PREFIX}image
-⭓───────────────⭓『 📤 CONVERTION 📥 』
-│ 🍁 ${config.PREFIX}url
-⭓─────────────────────⭓
-> *Diwate-bot*
-`;
+⭓─『 👤 PROPRIO👤  』 ─⭓
+│  🍁 ${config.PREFIX}spam
+│  🍁 ${config.PREFIX}bloque
+│  🍁 ${config.PREFIX}debloque
+│  🍁 ${config.PREFIX}add proprio
+│  🍁 ${config.PREFIX}del proprio
+╰───────────────────────────────────────⭓
+
+⭓────『 ✨ GIFS✨  』 ────⭓
+│  🍁 ${config.PREFIX}gifle @qui
+│  🍁 ${config.PREFIX}calin @qui
+│  🍁 ${config.PREFIX}bisou @qui
+│  🍁 ${config.PREFIX}caresse @qui
+│  🍁 ${config.PREFIX}titille @qui
+│  🍁 ${config.PREFIX}mordre @qui
+│  🍁 ${config.PREFIX}tue @qui
+│  🍁 ${config.PREFIX}envoie @qui
+│  🍁 ${config.PREFIX}blottis @qui
+│  🍁 ${config.PREFIX}danse @qui
+│  🍁 ${config.PREFIX}boum @qui
+│  🍁 ${config.PREFIX}clin @qui
+│  🍁 ${config.PREFIX}tape @qui
+╰───────────────────────────────────────⭓
+
+⭓──── 『 🤖 AI 🤖 』 ────⭓
+│  🍁 ${config.PREFIX}traduit en <langue>
+│     (répondre à un message)
+╰───────────────────────────────────────⭓
+
+⭓─👤 DÉVELOPPEUR 👤─⭓
+│  🍁 ${config.PREFIX}dev
+╰───────────────────────────────────────⭓
+
+⭓──── 『 💫 FUN 💫 』 ────⭓
+│  🍁 ${config.PREFIX}rang
+│  🍁 ${config.PREFIX}citation
+╰───────────────────────────────────────⭓
+
+⭓─『 📱 TECH📱  』 ─⭓
+│  🍁 ${config.PREFIX}chiffre
+│  🍁 ${config.PREFIX}dechiffre
+╰───────────────────────────────────────⭓
+
+⭓─🎥 TÉLÉCHARGEMENT 🎥─⭓
+│  🍁 ${config.PREFIX}song
+│  🍁 ${config.PREFIX}image
+╰───────────────────────────────────────⭓
+
+⭓─『 📤 CONVERSION📥 』 ─⭓
+│  🍁 ${config.PREFIX}url
+╰───────────────────────────────────────⭓
+
+⭓─────────────────────────────────────⭓
+│  💬 *BOT ACTIF* - Tape .menu à tout moment
+│  🦇 © 2026 Diwate-bot • Tous droits réservés
+╰─────────────────────────────────────⭓
                     try {
                         // Timeout de sécurité via sendMessageSafe : si l'envoi reste bloqué (ex: image inaccessible), on bascule sur du texte
                         await sendMessageSafe(socket, sender, {
