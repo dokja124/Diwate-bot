@@ -47,10 +47,12 @@ async function handleSong(socket, msg, sender, args, fakevCard) {
             return false;
         }
         const video = resultats[0];
+        const videoUrl = video.url && video.url.startsWith('http') ? video.url : `https://www.youtube.com/watch?v=${video.id}`;
+        console.log('🎬 Vidéo trouvée:', video.title, '| URL:', videoUrl, '| ID:', video.id);
 
         await socket.sendMessage(sender, { react: { text: '📥', key: msg.key } }).catch(() => {});
 
-        const streamInfo = await play.stream(video.url);
+        const streamInfo = await play.stream(videoUrl);
         const fileName = `${sanitize(video.title)}_${Date.now()}.mp3`;
         filePath = path.join(TEMP_DIR, fileName);
 
@@ -83,4 +85,4 @@ async function handleSong(socket, msg, sender, args, fakevCard) {
 }
 
 module.exports = { handleSong };
-                                                                                       
+                
