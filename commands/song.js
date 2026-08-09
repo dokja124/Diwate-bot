@@ -66,7 +66,8 @@ async function handleSong(socket, msg, sender, args, fakevCard) {
 
         let streamInfo;
         try {
-            streamInfo = await play.stream(videoUrl);
+            const videoInfo = await play.video_info(videoUrl);
+            streamInfo = await play.stream_from_info(videoInfo);
         } catch (e) {
             await socket.sendMessage(sender, { text: `❌ *Erreur au STREAMING :*\n${e.message}\n\nURL testée : ${videoUrl}` }, { quoted: fakevCard || msg });
             return false;
