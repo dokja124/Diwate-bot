@@ -41,18 +41,36 @@ async function handleSong(socket, msg, sender, args, fakevCard) {
         const query = args.join(' ');
         await socket.sendMessage(sender, { react: { text: '🔎', key: msg.key } }).catch(() => {});
 
-        const resultats = await play.search(query, { limit: 1, source: { youtube: 'video' } });
+        let resultats;
+        try {
+            resultats = await play.search(query, { limit: 1, source: { youtube: 'video' } });
+        } catch (e) {
+            await socket.sendMessage(sender, { text: `❌ *Erreur à la RECHERCHE :*\n${e.message}` }, { quoted: fakevCard || msg });
+            return false;
+        }
+
         if (!resultats || resultats.length === 0) {
             await socket.sendMessage(sender, { text: `❌ *Aucun résultat pour "${query}".*` }, { quoted: fakevCard || msg });
             return false;
         }
         const video = resultats[0];
         const videoUrl = video.url && video.url.startsWith('http') ? video.url : `https://www.youtube.com/watch?v=${video.id}`;
-        console.log('🎬 Vidéo trouvée:', video.title, '| URL:', videoUrl, '| ID:', video.id);
 
+        if (!video.id) {
+            await socket.sendMessage(sender, { text: `❌ *Résultat sans ID vidéo.*\nDonnées reçues : ${JSON.stringify(video).slice(0, 300)}` }, { quoted: fakevCard || msg });
+            return false;
+        }
+
+        await socket.sendMessage(sender, { text: `🔗 *Debug :* ${videoUrl}` }, { quoted: fakevCard || msg }).catch(() => {});
         await socket.sendMessage(sender, { react: { text: '📥', key: msg.key } }).catch(() => {});
 
-        const streamInfo = await play.stream(videoUrl);
+        let streamInfo;
+        try {
+            streamInfo = await play.stream(videoUrl);
+        } catch (e) {
+            await socket.sendMessage(sender, { text: `❌ *Erreur au STREAMING :*\n${e.message}\n\nURL testée : ${videoUrl}` }, { quoted: fakevCard || msg });
+            return false;
+        }
         const fileName = `${sanitize(video.title)}_${Date.now()}.mp3`;
         filePath = path.join(TEMP_DIR, fileName);
 
@@ -85,4 +103,3 @@ async function handleSong(socket, msg, sender, args, fakevCard) {
 }
 
 module.exports = { handleSong };
-                
