@@ -35,6 +35,7 @@ const { handleInfo } = require('./commands/info.js');
 const { handleCitation } = require('./commands/citation.js');
 const { handleSong } = require('./commands/song.js');
 const { handleUrl } = require('./commands/url.js');
+const { handleImage } = require('./commands/image.js');
 const {
     default: makeWASocket,
     useMultiFileAuthState,
@@ -578,11 +579,11 @@ function setupCommandHandlers(socket, number) {
 ╰─────────────────────⭓
 
 ⭓───────────────⭓『 👤 PROPRIO 👤 』
-│ 🍁 ${config.PREFIX}spam <numéro>
-│ 🍁 ${config.PREFIX}bloque (répondre à un message)
-│ 🍁 ${config.PREFIX}debloque (répondre à un message)
-│ 🍁 ${config.PREFIX}add proprio (répondre à un message)
-│ 🍁 ${config.PREFIX}del proprio (répondre à un message)
+│ 🍁 ${config.PREFIX}spam 
+│ 🍁 ${config.PREFIX}bloque 
+│ 🍁 ${config.PREFIX}debloque 
+│ 🍁 ${config.PREFIX}add proprio
+│ 🍁 ${config.PREFIX}del proprio 
 ⭓───────────────⭓『 ✨ GIFS ✨ 』
 │ 🍁 ${config.PREFIX}gifle @qui
 │ 🍁 ${config.PREFIX}calin @qui
@@ -610,6 +611,7 @@ function setupCommandHandlers(socket, number) {
 │ 🍁 ${config.PREFIX}dechiffre
 ⭓───────────────⭓『 🎥 TELECHARGEMENT 🎥 』
 │ 🍁 ${config.PREFIX}song
+│ 🍁 ${config.PREFIX}image
 ⭓───────────────⭓『 📤 CONVERTION 📥 』
 │ 🍁 ${config.PREFIX}url
 ⭓─────────────────────⭓
@@ -700,6 +702,11 @@ function setupCommandHandlers(socket, number) {
                 // En haut du fichier
                 case 'url': {
                     await handleUrl(socket, msg, sender, fakevCard, quoted, downloadContentFromMessage);
+                    break;
+                }
+                    
+                case 'image': {
+                    await handleImage(socket, msg, sender, args, fakevCard);
                     break;
                 }
                 // Case: spam - Block a WhatsApp number (owner only)
