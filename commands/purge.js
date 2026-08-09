@@ -2,49 +2,56 @@
  * purge.js — Commande .purge : supprime tous les membres d'un groupe un par un.
  * Seul le propriétaire du bot peut exécuter cette commande.
  * Le bot doit être ADMIN du groupe.
- * 
+ *
  * Comment l'intégrer dans pair.js :
  * ----------------------------------
  * 1. En haut de pair.js, ajoute :
  *      const { handlePurge } = require('./purge');
- * 
+ *
  * 2. Dans le switch(command), ajoute :
  *      case 'purge': {
- *          await handlePurge(socket, msg, sender, isGroup, args, fakevCard, ownerNumber);
+ *          await handlePurge(socket, msg, sender, isGroup, nowsender, isOwner, fakevCard, args);
  *          break;
  *      }
  */
 
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
 /**
- * Vérifie si le bot est admin du groupe
+ * Vérifie si le bot est admin du groupe.
+ * Compare uniquement la partie "numéro" (avant @ et avant :), pour rester
+ * robuste face aux identifiants LID que WhatsApp utilise de plus en plus
+ * dans les listes de participants (au lieu du numéro classique).
  */
 async function isBotAdmin(socket, groupId) {
     try {
         const groupMeta = await socket.groupMetadata(groupId);
-        const botJid = socket.user.id.split(':')[0] + '@s.whatsapp.net';
-        const participant = groupMeta.participants.find(p => p.id === botJid);
+        const botNumber = socket.user.id.split('@')[0].split(':')[0];
+        const participant = groupMeta.participants.find(p => {
+            const pNumber = p.id.split('@')[0].split(':')[0];
+            return pNumber === botNumber;
+        });
         return participant?.admin === 'admin' || participant?.admin === 'superadmin';
     } catch (error) {
         console.error('Erreur vérification admin:', error.message);
-        return false;
+        return null; // null = impossible à vérifier (différent de false = pas admin)
     }
 }
 
 /**
- * Récupère tous les participants du groupe sauf le bot et le propriétaire
+ * Récupère tous les participants du groupe sauf le bot et la personne
+ * qui a lancé la commande (protégée pour ne pas s'auto-exclure).
  */
-async function getParticipantsToRemove(socket, groupId, ownerNumber) {
+async function getParticipantsToRemove(socket, groupId, nowsender) {
     try {
         const groupMeta = await socket.groupMetadata(groupId);
-        const botJid = socket.user.id.split(':')[0] + '@s.whatsapp.net';
-        const ownerClean = ownerNumber.split('@')[0].replace(/[^0-9]/g, '');
+        const botNumber = socket.user.id.split('@')[0].split(':')[0];
+        const senderNumber = (nowsender || '').split('@')[0].split(':')[0];
 
         return groupMeta.participants
             .filter(p => {
-                const pClean = p.id.split('@')[0].replace(/[^0-9]/g, '');
-                // Garde le bot et le propriétaire
-                return p.id !== botJid && pClean !== ownerClean;
+                const pNumber = p.id.split('@')[0].split(':')[0];
+                return pNumber !== botNumber && pNumber !== senderNumber;
             })
             .map(p => p.id);
     } catch (error) {
@@ -69,7 +76,7 @@ async function removeParticipant(socket, groupId, participantId) {
 // =============================================
 // COMMANDE PRINCIPALE .purge
 // =============================================
-async function handlePurge(socket, msg, sender, isGroup, args, fakevCard, isOwner) {
+async function handlePurge(socket, msg, sender, isGroup, nowsender, isOwner, fakevCard, args = []) {
     try {
         // 1. Vérifier que c'est un groupe
         if (!isGroup) {
@@ -79,18 +86,19 @@ async function handlePurge(socket, msg, sender, isGroup, args, fakevCard, isOwne
             return true;
         }
 
-        // 2. Vérifier que l'utilisateur est le propriétair
+        // 2. Vérifier que l'utilisateur est le propriétaire
         if (!isOwner) {
-        await socket.sendMessage(sender, {
-            text: '❌ *Seul le propriétaire du bot peut utiliser cette commande.*'
-        }, { quoted: fakevCard || msg }).catch(() => {});
-        return true;
-    }
+            await socket.sendMessage(sender, {
+                text: '❌ *Seul le propriétaire du bot peut utiliser cette commande.*'
+            }, { quoted: fakevCard || msg }).catch(() => {});
+            return true;
+        }
 
-        // 3. Vérifier que le bot est admin
+        // 3. Vérifier que le bot est admin (avertissement seulement si indétectable,
+        // ne bloque pas : la vraie confirmation vient de l'appel API lui-même à l'étape 8)
         const groupId = msg.key.remoteJid;
         const botIsAdmin = await isBotAdmin(socket, groupId);
-        if (!botIsAdmin) {
+        if (botIsAdmin === false) {
             await socket.sendMessage(sender, {
                 text: '❌ *Le bot doit être administrateur du groupe pour utiliser cette commande.*'
             }, { quoted: fakevCard || msg });
@@ -98,31 +106,29 @@ async function handlePurge(socket, msg, sender, isGroup, args, fakevCard, isOwne
         }
 
         // 4. Demander confirmation
-        const participants = await getParticipantsToRemove(socket, groupId, ownerNumber);
+        const participants = await getParticipantsToRemove(socket, groupId, nowsender);
         if (participants.length === 0) {
             await socket.sendMessage(sender, {
-                text: '✅ *Aucun membre à supprimer.*\n(Le bot et le propriétaire sont protégés)'
+                text: '✅ *Aucun membre à supprimer.*\n(Le bot et toi êtes protégés)'
             }, { quoted: fakevCard || msg });
             return true;
         }
 
-        // 5. Message de confirmation avec le nombre de membres
-        await socket.sendMessage(sender, {
-            text: `⚠️ *CONFIRMATION REQUISE*\n\nTu t'apprêtes à supprimer *${participants.length}* membre(s) du groupe.\n\n✅ Pour confirmer, tape :\n\`${args[0] || '.'}purge confirm\``
-        }, { quoted: fakevCard || msg });
-
-        // 6. Vérifier la confirmation
-        const confirmArg = args[1]?.toLowerCase();
+        // 5. Vérifier la confirmation (args[0], car "confirm" est le 1er mot après la commande)
+        const confirmArg = args[0]?.toLowerCase();
         if (confirmArg !== 'confirm') {
+            await socket.sendMessage(sender, {
+                text: `⚠️ *CONFIRMATION REQUISE*\n\nTu t'apprêtes à supprimer *${participants.length}* membre(s) du groupe.\n\n✅ Pour confirmer, tape :\n\`.purge confirm\``
+            }, { quoted: fakevCard || msg });
             return true;
         }
 
-        // 7. Envoyer un message de début
+        // 6. Envoyer un message de début
         await socket.sendMessage(sender, {
             text: `🔄 *Début de la purge...*\nSuppression de ${participants.length} membre(s)...`
         }, { quoted: fakevCard || msg });
 
-        // 8. Supprimer les membres un par un
+        // 7. Supprimer les membres un par un
         let successCount = 0;
         let failCount = 0;
         const total = participants.length;
@@ -131,27 +137,24 @@ async function handlePurge(socket, msg, sender, isGroup, args, fakevCard, isOwne
             const participant = participants[i];
             const removed = await removeParticipant(socket, groupId, participant);
 
-            if (removed) {
-                successCount++;
-            } else {
-                failCount++;
-            }
+            if (removed) successCount++;
+            else failCount++;
 
-            // Afficher la progression toutes les 5 suppressions
             if ((i + 1) % 5 === 0 || i === total - 1) {
                 await socket.sendMessage(sender, {
                     text: `📊 *Progression :* ${i + 1}/${total}\n✅ Réussis : ${successCount}\n❌ Échecs : ${failCount}`
                 }, { quoted: fakevCard || msg });
             }
 
-            // Pause de 500ms pour éviter les rate limits
-            await sleep(500);
+            await sleep(500); // évite les rate limits WhatsApp
         }
 
-        // 9. Message final
-        await socket.sendMessage(sender, {
-            text: `✅ *Purge terminé !*\n\n👥 Membres supprimés : ${successCount}\n❌ Échecs : ${failCount}\n📊 Total : ${total}\n\n🛡️ *Le bot et le propriétaire ont été préservés.*`
-        }, { quoted: fakevCard || msg });
+        // Si tout a échoué, le bot n'était probablement pas réellement admin
+        const messageFinal = successCount === 0 && failCount === total
+            ? `⚠️ *Purge terminée, mais 0 suppression n'a réussi.*\n\nLe bot n'est probablement pas réellement administrateur du groupe (vérifie ses permissions dans les paramètres du groupe).`
+            : `✅ *Purge terminée !*\n\n👥 Membres supprimés : ${successCount}\n❌ Échecs : ${failCount}\n📊 Total : ${total}\n\n🛡️ *Le bot et toi avez été préservés.*`;
+
+        await socket.sendMessage(sender, { text: messageFinal }, { quoted: fakevCard || msg });
 
         return true;
     } catch (error) {
@@ -164,3 +167,4 @@ async function handlePurge(socket, msg, sender, isGroup, args, fakevCard, isOwne
 }
 
 module.exports = { handlePurge };
+                    
