@@ -192,8 +192,6 @@ async function handleRang(socket, msg, sender, isGroup, nowsender, args, fakevCa
         const numeroPropre = target.split('@')[0];
         const tag = `@${numeroPropre}`;
 
-        await socket.sendMessage(sender, { react: { text: '🔎', key: msg.key } }).catch(() => {});
-
         const nomAffichage = await getNomAffichage(socket, msg, target, nowsender, isGroup);
         const roleGroupe = await getRoleGroupe(socket, msg, target, isGroup);
 
