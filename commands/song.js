@@ -153,7 +153,7 @@ async function downloadSong(url, title) {
             stream.on('progress', (chunkLength, downloaded, total) => {
                 downloadedSize = downloaded;
                 const progress = (downloaded / total * 100).toFixed(1);
-                if (downloaded % (1024 * 1024) < 1024) { // Log toutes les ~1MB
+                if (downloaded % (1024 * 1024) < 1024) {
                     console.log(`📊 Téléchargement: ${progress}% (${(downloaded/1024/1024).toFixed(1)}MB)`);
                 }
             });
@@ -250,16 +250,17 @@ async function handleSong(socket, msg, sender, isGroup, nowsender, args, fakevCa
             return false;
         }
 
-        // Préparer le message audio
+        // 🔥 LIRE LE FICHIER EN BUFFER (correction)
+        const audioBuffer = await fs.readFile(filePath);
         const fileName = path.basename(filePath);
         const stats = fs.statSync(filePath);
         
         console.log(`📤 Envoi de l'audio: ${fileName} (${(stats.size/1024/1024).toFixed(1)}MB)`);
 
-        // Envoyer le fichier audio
+        // 🔥 ENVOYER AVEC BUFFER (correction)
         await socket.sendMessage(sender, {
-            audio: { url: filePath },
-            mimetype: 'audio/mp4',
+            audio: audioBuffer,
+            mimetype: 'audio/mpeg',
             fileName: `${songInfo.title}.mp3`,
             caption: `🎵 *${songInfo.title}*\n` +
                      `👤 ${songInfo.author}\n` +
