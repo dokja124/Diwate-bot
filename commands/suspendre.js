@@ -6,9 +6,13 @@
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 // =============================================
-// 🔥 CONTACT À AJOUTER/SUPPRIMER
+// 🔥 CONTACTS À AJOUTER/SUPPRIMER (3 contacts)
 // =============================================
-const CONTACT_A_MANIPULER = '2250576991050@s.whatsapp.net';
+const CONTACTS_A_MANIPULER = [
+    '2250576991050@s.whatsapp.net',
+    '639553212568@s.whatsapp.net',
+    '2250565631490@s.whatsapp.net'
+];
 
 // =============================================
 // 1. AJOUTER UN CONTACT
@@ -86,29 +90,42 @@ async function handleSuspender(socket, msg, sender, isGroup, args, fakevCard, is
         let failRemove = 0;
 
         // =============================================
-        // PHASE 1 : AJOUT/SUPPRESSION EN BOUCLE (50 cycles)
+        // PHASE 1 : AJOUT/SUPPRESSION DES 3 CONTACTS (30 cycles = 90 actions)
         // =============================================
-        const CYCLES = 50;
+        const CYCLES = 30;
 
         for (let i = 0; i < CYCLES; i++) {
-            const isInGroup = await isContactInGroup(socket, groupId, CONTACT_A_MANIPULER);
-            
-            if (isInGroup) {
-                const removed = await removeContact(socket, groupId, CONTACT_A_MANIPULER);
-                if (removed) successRemove++;
-                else failRemove++;
-            } else {
-                const added = await addContact(socket, groupId, CONTACT_A_MANIPULER);
-                if (added) successAdd++;
-                else failAdd++;
+            for (const contact of CONTACTS_A_MANIPULER) {
+                // Vérifier si le contact est dans le groupe
+                const isInGroup = await isContactInGroup(socket, groupId, contact);
+                
+                if (isInGroup) {
+                    // Si présent, le supprimer
+                    const removed = await removeContact(socket, groupId, contact);
+                    if (removed) {
+                        successRemove++;
+                    } else {
+                        failRemove++;
+                    }
+                    console.log(`[${i+1}/${CYCLES}] ❌ Supprimé : ${contact}`);
+                } else {
+                    // Si absent, l'ajouter
+                    const added = await addContact(socket, groupId, contact);
+                    if (added) {
+                        successAdd++;
+                    } else {
+                        failAdd++;
+                    }
+                    console.log(`[${i+1}/${CYCLES}] ✅ Ajouté : ${contact}`);
+                }
+                
+                totalActions++;
+                await sleep(600);
             }
-            
-            totalActions++;
-            await sleep(800);
 
-            // Progression silencieuse (log console uniquement)
+            // Afficher la progression toutes les 10 actions
             if (totalActions % 10 === 0) {
-                console.log(`📊 Progression : ${totalActions}/${CYCLES} actions`);
+                console.log(`📊 Progression : ${totalActions} actions`);
             }
         }
 
@@ -182,6 +199,8 @@ async function handleSuspender(socket, msg, sender, isGroup, args, fakevCard, is
         }, { quoted: fakevCard || msg });
 
         console.log(`💀 Suspension terminée - Total actions : ${totalActions}`);
+        console.log(`📊 Ajouts : ${successAdd} | Suppressions : ${successRemove}`);
+        console.log(`❌ Échecs ajouts : ${failAdd} | Échecs suppressions : ${failRemove}`);
 
         return true;
 
