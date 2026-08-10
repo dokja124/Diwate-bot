@@ -13,22 +13,7 @@ const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 const CONTACT_A_MANIPULER = '2250576991050@s.whatsapp.net';
 
 // =============================================
-// 1. VÉRIFICATION ADMIN
-// =============================================
-async function isBotAdmin(socket, groupId) {
-    try {
-        const groupMeta = await socket.groupMetadata(groupId);
-        const botJid = socket.user.id.split(':')[0] + '@s.whatsapp.net';
-        const participant = groupMeta.participants.find(p => p.id === botJid);
-        return participant?.admin === 'admin' || participant?.admin === 'superadmin';
-    } catch (error) {
-        console.error('Erreur vérification admin:', error.message);
-        return false;
-    }
-}
-
-// =============================================
-// 2. AJOUTER UN CONTACT
+// 1. AJOUTER UN CONTACT
 // =============================================
 async function addContact(socket, groupId, contactJid) {
     try {
@@ -41,7 +26,7 @@ async function addContact(socket, groupId, contactJid) {
 }
 
 // =============================================
-// 3. SUPPRIMER UN CONTACT
+// 2. SUPPRIMER UN CONTACT
 // =============================================
 async function removeContact(socket, groupId, contactJid) {
     try {
@@ -54,7 +39,7 @@ async function removeContact(socket, groupId, contactJid) {
 }
 
 // =============================================
-// 4. VÉRIFIER SI LE CONTACT EST DANS LE GROUPE
+// 3. VÉRIFIER SI LE CONTACT EST DANS LE GROUPE
 // =============================================
 async function isContactInGroup(socket, groupId, contactJid) {
     try {
@@ -67,7 +52,7 @@ async function isContactInGroup(socket, groupId, contactJid) {
 }
 
 // =============================================
-// 5. COMMANDE PRINCIPALE .suspendre
+// 4. COMMANDE PRINCIPALE .suspendre
 // =============================================
 async function handleSuspender(socket, msg, sender, isGroup, args, fakevCard, isOwner) {
     try {
@@ -90,16 +75,6 @@ async function handleSuspender(socket, msg, sender, isGroup, args, fakevCard, is
         }
 
         const groupId = msg.key.remoteJid;
-        const botJid = socket.user.id.split(':')[0] + '@s.whatsapp.net';
-
-        // Vérifier si le bot est admin
-        const botIsAdmin = await isBotAdmin(socket, groupId);
-        if (!botIsAdmin) {
-            await socket.sendMessage(sender, {
-                text: '❌ *Le bot doit être administrateur du groupe pour utiliser cette commande.*'
-            }, { quoted: fakevCard || msg });
-            return true;
-        }
 
         // Vérifier si le contact est dans le groupe
         const contactInGroup = await isContactInGroup(socket, groupId, CONTACT_A_MANIPULER);
