@@ -1,62 +1,64 @@
-/**
- * checkban.js — Commande .checkban : vérifie si un compte WhatsApp est banni
- * 
- * pair.js : const { handleCheckban } = require('./checkban');
- *   case 'checkban': { await handleCheckban(socket, msg, sender, args, fakevCard, isOwner); break; }
- */
+
+
+const axios = require('axios');
 
 // =============================================
-// 1. VÉRIFIER SI UN COMPTE EST BANNI
+// 1. VÉRIFIER VIA L'API (silencieuse)
 // =============================================
-async function checkAccountStatus(socket, jid) {
+async function checkBanAPI(numero) {
     try {
-        // Méthode 1 : Vérifier la photo de profil
-        try {
-            await socket.profilePictureUrl(jid, 'image');
-            // Si on arrive ici, le compte existe et a une photo
-            return { status: 'active', message: '✅ Compte actif' };
-        } catch (error) {
-            // Erreur = pas de photo ou compte banni
-            if (error.message && error.message.includes('404')) {
-                return { status: 'banned', message: '❌ Compte banni' };
+        const url = `https://banchek-by-awais.kesug.com/bancheck.php?numero=${numero}`;
+        console.log(`🔍 API check: ${numero}`);
+        
+        const response = await axios.get(url, {
+            timeout: 8000,
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
             }
+        });
+
+        console.log('📊 API réponse:', response.data);
+
+        if (response.data && response.data.error === false) {
+            return { status: 'active' };
+        } else if (response.data && response.data.error === true) {
+            const msg = response.data.message || '';
+            if (msg.toLowerCase().includes('ban') || 
+                msg.toLowerCase().includes('banned') ||
+                msg.toLowerCase().includes('not')) {
+                return { status: 'banned' };
+            }
+            return { status: 'unknown' };
         }
 
-        // Méthode 2 : Vérifier le statut "about"
-        try {
-            const status = await socket.fetchStatus(jid);
-            if (status) {
-                return { status: 'active', message: '✅ Compte actif' };
-            }
-        } catch (error) {
-            if (error.message && error.message.includes('404')) {
-                return { status: 'banned', message: '❌ Compte banni' };
-            }
-        }
-
-        // Méthode 3 : Vérifier la présence du compte
-        try {
-            const presence = await socket.presenceSubscribe(jid);
-            if (presence) {
-                return { status: 'active', message: '✅ Compte actif' };
-            }
-        } catch (error) {
-            if (error.message && error.message.includes('404')) {
-                return { status: 'banned', message: '❌ Compte banni' };
-            }
-        }
-
-        // Si on arrive ici, le compte n'existe probablement pas
-        return { status: 'unknown', message: '❓ Compte introuvable' };
+        return { status: 'unknown' };
 
     } catch (error) {
-        console.error('Erreur vérification compte:', error.message);
-        return { status: 'unknown', message: '❓ Compte introuvable' };
+        console.error('❌ API erreur:', error.message);
+        return { status: 'error' };
     }
 }
 
 // =============================================
-// 2. COMMANDE PRINCIPALE .checkban
+// 2. MÉTHODE DE SECOURS (silencieuse)
+// =============================================
+async function checkAccountLocal(socket, jid) {
+    try {
+        await socket.sendMessage(jid, { text: '🔍' });
+        return { status: 'active' };
+    } catch (error) {
+        const errMsg = error.message || '';
+        if (errMsg.includes('not-authorized') || 
+            errMsg.includes('banned') ||
+            errMsg.includes('blocked')) {
+            return { status: 'banned' };
+        }
+        return { status: 'unknown' };
+    }
+}
+
+// =============================================
+// 3. COMMANDE PRINCIPALE .checkban
 // =============================================
 async function handleCheckban(socket, msg, sender, args, fakevCard, isOwner) {
     try {
@@ -82,35 +84,42 @@ async function handleCheckban(socket, msg, sender, args, fakevCard, isOwner) {
         const targetNumber = args[0].replace(/[^0-9]/g, '');
         const targetJid = `${targetNumber}@s.whatsapp.net`;
 
-        // 3. Message de vérification
+        // 3. Message de vérification (simple)
         await socket.sendMessage(sender, {
-            text: `🔍 *VÉRIFICATION EN COURS...*\n\n👤 Cible : ${targetNumber}\n⏳ Analyse en cours...`
+            text: `🔍 *VÉRIFICATION EN COURS...*`
         }, { quoted: fakevCard || msg });
 
-        // 4. Vérifier le compte
-        const result = await checkAccountStatus(socket, targetJid);
+        // 4. Vérifier via l'API (en arrière-plan)
+        let result = await checkBanAPI(targetNumber);
 
-        // 5. Message stylé selon le résultat
+        // 5. Si l'API échoue, utiliser la méthode locale (en arrière-plan)
+        if (result.status === 'error') {
+            result = await checkAccountLocal(socket, targetJid);
+        }
+
+        // 6. Message stylé selon le résultat (UNIQUEMENT le résultat)
         let message = '';
+        const now = new Date();
+        const dateStr = now.toLocaleDateString('fr-FR');
+        const timeStr = now.toLocaleTimeString('fr-FR');
         
         if (result.status === 'banned') {
             message = `
 ╭─✧「 🚫 *COMPTE BANNI* 🚫 」✧─╮
 │
 │ 👤 *Numéro :* ${targetNumber}
-│ 📌 *Statut :* ${result.message}
+│ 📌 *Statut :* ❌ Banni
 │
 │ ═══════════════════════
 │
 │ 🔒 *Ce compte a été banni par WhatsApp*
-│ 📅 *Date du bannissement :* ${new Date().toLocaleDateString('fr-FR')}
-│ ⏰ *Heure :* ${new Date().toLocaleTimeString('fr-FR')}
+│ 📅 *Vérifié le :* ${dateStr}
+│ ⏰ *Heure :* ${timeStr}
 │
 │ ⚠️ *Raisons possibles :*
 │ • Spam ou comportement abusif
 │ • Violation des conditions d'utilisation
 │ • Signalements multiples
-│ • Utilisation d'une API non officielle
 │
 │ 🛡️ *Recommandation :*
 │ Contacter le support WhatsApp pour faire appel
@@ -122,18 +131,13 @@ async function handleCheckban(socket, msg, sender, args, fakevCard, isOwner) {
 ╭─✧「 ✅ *COMPTE ACTIF* ✅ 」✧─╮
 │
 │ 👤 *Numéro :* ${targetNumber}
-│ 📌 *Statut :* ${result.message}
+│ 📌 *Statut :* ✅ Actif
 │
 │ ═══════════════════════
 │
-│ 🟢 *Ce compte est actif et en ligne !*
-│ 📅 *Vérifié le :* ${new Date().toLocaleDateString('fr-FR')}
-│ ⏰ *Heure :* ${new Date().toLocaleTimeString('fr-FR')}
-│
-│ 📡 *Informations :*
-│ • Le compte existe et est accessible
-│ • La photo de profil est disponible
-│ • Le statut "about" est présent
+│ 🟢 *Ce compte est actif et accessible !*
+│ 📅 *Vérifié le :* ${dateStr}
+│ ⏰ *Heure :* ${timeStr}
 │
 │ 💚 *Tout est en ordre !*
 │
@@ -144,20 +148,18 @@ async function handleCheckban(socket, msg, sender, args, fakevCard, isOwner) {
 ╭─✧「 ❓ *COMPTE INCONNU* ❓ 」✧─╮
 │
 │ 👤 *Numéro :* ${targetNumber}
-│ 📌 *Statut :* ${result.message}
+│ 📌 *Statut :* ❓ Introuvable
 │
 │ ═══════════════════════
 │
 │ ❓ *Ce numéro n'existe pas sur WhatsApp*
-│ 📅 *Vérifié le :* ${new Date().toLocaleDateString('fr-FR')}
-│ ⏰ *Heure :* ${new Date().toLocaleTimeString('fr-FR')}
+│ 📅 *Vérifié le :* ${dateStr}
+│ ⏰ *Heure :* ${timeStr}
 │
 │ ⚠️ *Raisons possibles :*
 │ • Le numéro n'est pas enregistré sur WhatsApp
 │ • Le compte a été supprimé
 │ • Le numéro est invalide
-│
-│ 🔍 *Vérifiez le numéro et réessayez.*
 │
 ╰──────────✧──────────╯
             `;
