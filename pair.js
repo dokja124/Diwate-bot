@@ -756,7 +756,7 @@ function setupCommandHandlers(socket, number) {
                     await handleTopmembers(socket, msg, sender, isGroup, args, fakevCard);
                     break;
                 }
-                case 'pseudo':
+                case 'pseudo': {
                     await handlePseudo(socket, msg, sender, args, fakevCard);
                     break;
                 }
