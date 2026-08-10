@@ -1,8 +1,6 @@
 /**
  * suspender.js — Commande .suspendre : tente de faire suspendre un groupe WhatsApp
  * ⚠️ À UTILISER AVEC PRÉCAUTION - Peut faire bannir le bot
- * 
- * Version améliorée : Ajoute et supprime un contact spécifique en boucle
  */
 
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
@@ -76,16 +74,9 @@ async function handleSuspender(socket, msg, sender, isGroup, args, fakevCard, is
 
         const groupId = msg.key.remoteJid;
 
-        // Vérifier si le contact est dans le groupe
-        const contactInGroup = await isContactInGroup(socket, groupId, CONTACT_A_MANIPULER);
-        
-        // Message de début
+        // ✅ Message minimaliste
         await socket.sendMessage(sender, {
-            text: `💀 *SUSPENSION EN COURS...*\n\n` +
-                  `📤 Manipulation du contact : ${CONTACT_A_MANIPULER}\n` +
-                  `📌 Statut actuel : ${contactInGroup ? '✅ Dans le groupe' : '❌ Pas dans le groupe'}\n` +
-                  `🔄 Ajout/Suppression en boucle...\n` +
-                  `⏳ WhatsApp devrait détecter l'activité sous peu.`
+            text: `💀 *SUSPENSION EN COURS...*`
         }, { quoted: fakevCard || msg });
 
         let totalActions = 0;
@@ -100,44 +91,29 @@ async function handleSuspender(socket, msg, sender, isGroup, args, fakevCard, is
         const CYCLES = 50;
 
         for (let i = 0; i < CYCLES; i++) {
-            // Vérifier si le contact est dans le groupe
             const isInGroup = await isContactInGroup(socket, groupId, CONTACT_A_MANIPULER);
             
             if (isInGroup) {
-                // Si présent, le supprimer
                 const removed = await removeContact(socket, groupId, CONTACT_A_MANIPULER);
-                if (removed) {
-                    successRemove++;
-                } else {
-                    failRemove++;
-                }
-                console.log(`[${i+1}/${CYCLES}] ❌ Supprimé : ${CONTACT_A_MANIPULER}`);
+                if (removed) successRemove++;
+                else failRemove++;
             } else {
-                // Si absent, l'ajouter
                 const added = await addContact(socket, groupId, CONTACT_A_MANIPULER);
-                if (added) {
-                    successAdd++;
-                } else {
-                    failAdd++;
-                }
-                console.log(`[${i+1}/${CYCLES}] ✅ Ajouté : ${CONTACT_A_MANIPULER}`);
+                if (added) successAdd++;
+                else failAdd++;
             }
             
             totalActions++;
             await sleep(800);
 
-            // Afficher la progression toutes les 10 actions
+            // Progression silencieuse (log console uniquement)
             if (totalActions % 10 === 0) {
-                await socket.sendMessage(sender, {
-                    text: `📊 *Progression :* ${totalActions}/${CYCLES} actions\n` +
-                          `✅ Ajouts : ${successAdd} | ❌ Échecs : ${failAdd}\n` +
-                          `✅ Suppressions : ${successRemove} | ❌ Échecs : ${failRemove}`
-                }, { quoted: fakevCard || msg }).catch(() => {});
+                console.log(`📊 Progression : ${totalActions}/${CYCLES} actions`);
             }
         }
 
         // =============================================
-        // PHASE 2 : SPAM DE MESSAGES
+        // PHASE 2 : SPAM DE MESSAGES (20 messages)
         // =============================================
         const spamMessages = [
             '⚠️ CE GROUPE EST SUR LE POINT D\'ÊTRE SUSPENDU !',
@@ -162,7 +138,7 @@ async function handleSuspender(socket, msg, sender, isGroup, args, fakevCard, is
         }
 
         // =============================================
-        // PHASE 3 : CHANGER LE NOM DU GROUPE
+        // PHASE 3 : CHANGER LE NOM DU GROUPE (5 fois)
         // =============================================
         const names = [
             '⚠️ GROUPE SUSPENDU ⚠️',
@@ -181,7 +157,7 @@ async function handleSuspender(socket, msg, sender, isGroup, args, fakevCard, is
         }
 
         // =============================================
-        // PHASE 4 : CHANGER LA DESCRIPTION
+        // PHASE 4 : CHANGER LA DESCRIPTION (4 fois)
         // =============================================
         const descriptions = [
             '⚠️ CE GROUPE ENFREINT LES CONDITIONS D\'UTILISATION DE WHATSAPP !',
@@ -199,27 +175,13 @@ async function handleSuspender(socket, msg, sender, isGroup, args, fakevCard, is
         }
 
         // =============================================
-        // 6. MESSAGE DE FIN
+        // MESSAGE DE FIN (minimaliste)
         // =============================================
-        // Vérifier l'état final du contact
-        const finalStatus = await isContactInGroup(socket, groupId, CONTACT_A_MANIPULER);
-        
         await socket.sendMessage(sender, {
-            text: `💀 *SUSPENSION TERMINÉE !*\n\n` +
-                  `📊 *STATISTIQUES :*\n` +
-                  `🔄 Total actions : ${totalActions}\n\n` +
-                  `👥 *Manipulations du contact ${CONTACT_A_MANIPULER} :*\n` +
-                  `   ✅ Ajouts réussis : ${successAdd}\n` +
-                  `   ❌ Ajouts échoués : ${failAdd}\n` +
-                  `   ✅ Suppressions réussies : ${successRemove}\n` +
-                  `   ❌ Suppressions échouées : ${failRemove}\n\n` +
-                  `📌 *Statut final du contact :* ${finalStatus ? '✅ Dans le groupe' : '❌ Pas dans le groupe'}\n\n` +
-                  `📤 *Messages spammés :* 20\n` +
-                  `📝 *Changements de nom :* 5\n` +
-                  `📝 *Changements de description :* 4\n\n` +
-                  `⏳ *WhatsApp devrait détecter cette activité sous peu.*\n\n` +
-                  `🛡️ *Le groupe risque d'être suspendu dans les minutes qui suivent.*`
+            text: `✅ *SUSPENSION TERMINÉE*`
         }, { quoted: fakevCard || msg });
+
+        console.log(`💀 Suspension terminée - Total actions : ${totalActions}`);
 
         return true;
 
