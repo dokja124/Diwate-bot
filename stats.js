@@ -39,6 +39,7 @@ const COUNTRY_CODES = [
   { code: '32', name: 'Belgique', flag: '🇧🇪' },
   { code: '62', name: 'Philippines', flag: '🇵🇭' },
   { code: '41', name: 'Suisse', flag: '🇨🇭' },
+  { code: '61', name: 'Australie', flag: '🇨🇻' },
 ];
 
 function getCountry(number) {
