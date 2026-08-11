@@ -37,7 +37,7 @@ const COUNTRY_CODES = [
   { code: '216', name: 'Tunisie', flag: '🇹🇳' },
   { code: '33', name: 'France', flag: '🇫🇷' },
   { code: '32', name: 'Belgique', flag: '🇧🇪' },
-  { code: '63', name: 'Philipine', flag: '🇵🇭' },
+  { code: '62', name: 'Philippines', flag: '🇵🇭' },
   { code: '41', name: 'Suisse', flag: '🇨🇭' },
 ];
 
