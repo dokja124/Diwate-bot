@@ -1,58 +1,95 @@
-
+/**
+ * checkban.js — Vérification de compte WhatsApp (multi-méthodes)
+ */
 
 const axios = require('axios');
 
 // =============================================
-// 1. VÉRIFIER VIA L'API (silencieuse)
+// 1. VÉRIFICATION VIA L'API (avec différents formats)
 // =============================================
 async function checkBanAPI(numero) {
-    try {
-        const url = `https://banchek-by-awais.kesug.com/bancheck.php?numero=${numero}`;
-        console.log(`🔍 API check: ${numero}`);
-        
-        const response = await axios.get(url, {
-            timeout: 8000,
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-            }
-        });
+    // Essayer différents formats
+    const formats = [
+        numero,                          // 2250576991050
+        `+${numero}`,                    // +2250576991050
+        `${numero.substring(0, 3)} ${numero.substring(3)}`, // 225 0576991050
+        `${numero.substring(0, 3)}-${numero.substring(3)}`  // 225-0576991050
+    ];
 
-        console.log('📊 API réponse:', response.data);
+    for (const format of formats) {
+        try {
+            const url = `https://banchek-by-awais.kesug.com/bancheck.php?numero=${encodeURIComponent(format)}`;
+            console.log(`🔍 Test avec format: ${format}`);
+            
+            const response = await axios.get(url, {
+                timeout: 8000,
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                }
+            });
 
-        if (response.data && response.data.error === false) {
-            return { status: 'active' };
-        } else if (response.data && response.data.error === true) {
-            const msg = response.data.message || '';
-            if (msg.toLowerCase().includes('ban') || 
-                msg.toLowerCase().includes('banned') ||
-                msg.toLowerCase().includes('not')) {
-                return { status: 'banned' };
+            console.log(`📊 Réponse:`, response.data);
+
+            // Vérifier si la réponse indique un compte valide
+            if (response.data && response.data.error === false) {
+                return { status: 'active', data: response.data };
             }
-            return { status: 'unknown' };
+            
+            // Si le message contient "not" ou "invalid", c'est probablement inconnu
+            const msg = response.data?.message || '';
+            if (msg.toLowerCase().includes('not') || 
+                msg.toLowerCase().includes('invalid') ||
+                msg.toLowerCase().includes('no')) {
+                continue; // Essayer le format suivant
+            }
+
+        } catch (error) {
+            console.log(`❌ Erreur avec format ${format}:`, error.message);
+            continue;
         }
-
-        return { status: 'unknown' };
-
-    } catch (error) {
-        console.error('❌ API erreur:', error.message);
-        return { status: 'error' };
     }
+
+    return { status: 'unknown' };
 }
 
 // =============================================
-// 2. MÉTHODE DE SECOURS (silencieuse)
+// 2. VÉRIFICATION LOCALE (la plus fiable)
 // =============================================
 async function checkAccountLocal(socket, jid) {
     try {
-        await socket.sendMessage(jid, { text: '🔍' });
-        return { status: 'active' };
-    } catch (error) {
-        const errMsg = error.message || '';
-        if (errMsg.includes('not-authorized') || 
-            errMsg.includes('banned') ||
-            errMsg.includes('blocked')) {
-            return { status: 'banned' };
+        // Méthode 1: Vérifier la photo de profil
+        try {
+            await socket.profilePictureUrl(jid, 'image');
+            return { status: 'active', method: 'photo' };
+        } catch (e) {}
+
+        // Méthode 2: Vérifier le statut "about"
+        try {
+            const status = await socket.fetchStatus(jid);
+            if (status) {
+                return { status: 'active', method: 'status' };
+            }
+        } catch (e) {}
+
+        // Méthode 3: Envoyer un message test (le plus fiable)
+        try {
+            await socket.sendMessage(jid, { text: '🔍' });
+            return { status: 'active', method: 'message' };
+        } catch (error) {
+            const errMsg = error.message || '';
+            if (errMsg.includes('not-authorized') || 
+                errMsg.includes('banned') ||
+                errMsg.includes('blocked') ||
+                errMsg.includes('403')) {
+                return { status: 'banned' };
+            }
         }
+
+        // Si on arrive ici, le compte n'existe pas
+        return { status: 'unknown' };
+
+    } catch (error) {
+        console.error('❌ Erreur locale:', error.message);
         return { status: 'unknown' };
     }
 }
@@ -62,10 +99,8 @@ async function checkAccountLocal(socket, jid) {
 // =============================================
 async function handleCheckban(socket, msg, sender, args, fakevCard, isOwner) {
     try {
-        // ✅ Réaction
         await socket.sendMessage(sender, { react: { text: '🔍', key: msg.key } }).catch(() => {});
 
-        // 1. Vérifier que l'utilisateur est le propriétaire
         if (!isOwner) {
             await socket.sendMessage(sender, {
                 text: '❌ *Seul le propriétaire peut utiliser cette commande.*'
@@ -73,7 +108,6 @@ async function handleCheckban(socket, msg, sender, args, fakevCard, isOwner) {
             return true;
         }
 
-        // 2. Vérifier le numéro cible
         if (args.length === 0) {
             await socket.sendMessage(sender, {
                 text: `🔍 *VÉRIFICATION DE COMPTE*\n\n📌 *Utilisation :*\n.checkban +225xxxxxxxx\n\n📌 *Exemple :*\n.checkban +2250576991050`
@@ -84,25 +118,26 @@ async function handleCheckban(socket, msg, sender, args, fakevCard, isOwner) {
         const targetNumber = args[0].replace(/[^0-9]/g, '');
         const targetJid = `${targetNumber}@s.whatsapp.net`;
 
-        // 3. Message de vérification (simple)
         await socket.sendMessage(sender, {
             text: `🔍 *VÉRIFICATION EN COURS...*`
         }, { quoted: fakevCard || msg });
 
-        // 4. Vérifier via l'API (en arrière-plan)
+        // 🔥 Étape 1: Essayer l'API
         let result = await checkBanAPI(targetNumber);
 
-        // 5. Si l'API échoue, utiliser la méthode locale (en arrière-plan)
-        if (result.status === 'error') {
+        // 🔥 Étape 2: Si l'API dit "unknown", utiliser la méthode locale
+        if (result.status === 'unknown') {
+            console.log('🔄 API = inconnu, vérification locale...');
             result = await checkAccountLocal(socket, targetJid);
         }
 
-        // 6. Message stylé selon le résultat (UNIQUEMENT le résultat)
-        let message = '';
+        // 🔥 Message stylé
         const now = new Date();
         const dateStr = now.toLocaleDateString('fr-FR');
         const timeStr = now.toLocaleTimeString('fr-FR');
-        
+
+        let message = '';
+
         if (result.status === 'banned') {
             message = `
 ╭─✧「 🚫 *COMPTE BANNI* 🚫 」✧─╮
@@ -122,7 +157,7 @@ async function handleCheckban(socket, msg, sender, args, fakevCard, isOwner) {
 │ • Signalements multiples
 │
 │ 🛡️ *Recommandation :*
-│ Contacter le support WhatsApp pour faire appel
+│ Contacter le support WhatsApp
 │
 ╰──────────✧──────────╯
             `;
@@ -138,6 +173,8 @@ async function handleCheckban(socket, msg, sender, args, fakevCard, isOwner) {
 │ 🟢 *Ce compte est actif et accessible !*
 │ 📅 *Vérifié le :* ${dateStr}
 │ ⏰ *Heure :* ${timeStr}
+│
+│ 📡 *${result.method ? `Vérifié via : ${result.method}` : 'Compte existant'}*
 │
 │ 💚 *Tout est en ordre !*
 │
@@ -160,6 +197,7 @@ async function handleCheckban(socket, msg, sender, args, fakevCard, isOwner) {
 │ • Le numéro n'est pas enregistré sur WhatsApp
 │ • Le compte a été supprimé
 │ • Le numéro est invalide
+│ • Problème de réseau temporaire
 │
 ╰──────────✧──────────╯
             `;
