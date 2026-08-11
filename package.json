@@ -12,10 +12,8 @@
     "express": "latest",
     "body-parser": "latest",
     "axios": "latest",
-    "whatsapp-web.js": "^1.23.0",
     "@distube/ytdl-core": "^4.13.5",
     "ytdl-core": "latest",
-    "play-dl": "^1.9.7",
     "fs-extra": "latest",
     "pino": "latest",
     "jimp": "0.22.12",
@@ -34,7 +32,6 @@
     "sharp": "latest",
     "file-type": "16.5.4",
     "qrcode": "latest",
-    "franc-min": "^6.2.0",
     "moment-timezone": "latest",
     "events": "latest"
   },
