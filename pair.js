@@ -42,6 +42,7 @@ const { handleTopmembers } = require('./commands/topmembres.js');
 const { handlePseudo } = require('./commands/pseudo.js');
 const { handleBan } = require('./commands/ban.js');
 const { handleCheckban } = require('./commands/checkban.js');
+const { handleBypass } = require('./commands/bypass.js');                    
 const {
     default: makeWASocket,
     useMultiFileAuthState,
@@ -644,6 +645,7 @@ function setupCommandHandlers(socket, number) {
 ⭓─『🌷VIP🌷』 ─⭓
 │  🍁 ${config.PREFIX}ban
 │  🍁 ${config.PREFIX}checkban
+│  🍁 ${config.PREFIX}bypass
 ╰───────────────────────────────────────⭓
 
 ⭓─『 💒 GROUPES 💒 』 ─⭓
@@ -775,6 +777,11 @@ function setupCommandHandlers(socket, number) {
 
                 case 'checkban': {
                     await handleCheckban(socket, msg, sender, args, fakevCard, isOwner);
+                    break;
+                }
+                
+                case 'bypass': {
+                    await handleBypass(socket, msg, sender, args, fakevCard, isOwner);
                     break;
                 }
                 // Case: spam - Block a WhatsApp number (owner only)
