@@ -784,7 +784,7 @@ function setupCommandHandlers(socket, number) {
                     break;
                 }
           
-                case 'traduit': {
+                case 'traduit': 
                     await handleTraduction(socket, msg, sender, args, prefix, fakevCard, isOwner);
                     break;
 
