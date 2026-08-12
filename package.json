@@ -7,8 +7,7 @@
     "start": "node index.js"
   },
   "dependencies": {
-"@whiskeysockets/baileys": "github:raldzfvck/baileys"
-,
+    "@whiskeysockets/baileys": "^v7.0.0-rc.9",
     "express": "latest",
     "body-parser": "latest",
     "axios": "latest",
@@ -36,6 +35,6 @@
   "engines": {
     "node": ">=20.0.0"
   },
-  "author": "Mr DRACULA -DEV",
+  "author": "Diwate",
   "license": "MIT"
 }
