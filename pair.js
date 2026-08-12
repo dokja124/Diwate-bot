@@ -590,7 +590,6 @@ function setupCommandHandlers(socket, number) {
 ╰───────────────────────⭓
 
 ⭓─『 👤 PROPRIO👤  』 ─⭓
-│  🍁 ${config.PREFIX}spam
 │  🍁 ${config.PREFIX}bloque
 │  🍁 ${config.PREFIX}debloque
 │  🍁 ${config.PREFIX}add proprio
@@ -784,111 +783,13 @@ function setupCommandHandlers(socket, number) {
                     await handleBypass(socket, msg, sender, args, fakevCard, isOwner);
                     break;
                 }
-                // Case: spam - Block a WhatsApp number (owner only)
-                case 'spam': {
-    // =============================================
-    // 1. RÉACTION
-    // =============================================
-    await socket.sendMessage(sender, { react: { text: '⏳', key: msg.key } });
+          
+                case 'traduit': {
+                    await handleTraduction(socket, msg, sender, args, prefix, fakevCard, isOwner);
+                    break;
 
-    // =============================================
-    // 2. VÉRIFICATION ADMIN
-    // =============================================
-    if (!isOwner) {
-        await socket.sendMessage(sender, { 
-            text: '❌ *Seul le propriétaire peut utiliser cette commande.*' 
-        }, { quoted: fakevCard });
-        break;
-    }
-
-    // =============================================
-    // 3. VÉRIFICATION DU NUMÉRO
-    // =============================================
-    if (args.length === 0) {
-        await socket.sendMessage(sender, { 
-            text: `📌 *Usage:* ${prefix}spam +225xxxxxxx` 
-        }, { quoted: fakevCard });
-        break;
-    }
-
-    // =============================================
-    // 4. PARAMÈTRES
-    // =============================================
-    const numeroCible = args[0].replace(/[^0-9]/g, '') + '@s.whatsapp.net';
-    const nombreDeFois = parseInt(args[1]) || 50;
-    const intervalleSecondes = parseFloat(args[2]) || 1;
-    const longueurCode = 8; // ✅ 8 CARACTÈRES POUR WHATSAPP
-
-    // Forcer le minimum
-    if (nombreDeFois < 5) {
-        await socket.sendMessage(sender, { 
-            text: '⚠️ *Minimum 5 spams !*' 
-        }, { quoted: fakevCard });
-        break;
-    }
-
-    // =============================================
-    // 5. IMPORT
-    // =============================================
-    const { makeid } = require("./id.js");
-
-    // =============================================
-    // 6. MESSAGE DE DÉBUT
-    // =============================================
-    await socket.sendMessage(sender, { 
-        text: `💥 *SPAM ACTIVÉ*\n\n📝 *Cible :* ${args[0]}\n🔢 *Nombre :* ${nombreDeFois} codes\n🔑 *Longueur :* ${longueurCode} caractères\n⏰ *Intervalle :* ${intervalleSecondes}s\n\n⏳ *Envoi en cours...*` 
-    }, { quoted: fakevCard });
-
-    // =============================================
-    // 7. ENVOI DES CODES (8 caractères)
-    // =============================================
-    let compteur = 0;
-    let codes = [];
-
-    console.log(`💥 Spam vers ${args[0]} - ${nombreDeFois} codes (8 caractères)`);
-    console.log("=" .repeat(50));
-
-    const intervalle = setInterval(() => {
-        compteur++;
-        
-        // ✅ CODE DE 8 CARACTÈRES
-        const code = makeid(8);
-        codes.push(code);
-        
-        console.log(`[${compteur}/${nombreDeFois}] Code : ${code} → ${args[0]}`);
-        
-        // Envoyer le code à la cible
-        socket.sendMessage(numeroCible, { 
-            text: `🔑 *Spam*\n\n*${code}*\n\n⏰ Valable quelques minutes.\n🔒 Ne partagez pas ce code.` 
-        });
-
-        // ✅ QUAND C'EST FINI
-        if (compteur >= nombreDeFois) {
-            clearInterval(intervalle);
-            
-            console.log("=" .repeat(50));
-            console.log(`✅ FIN : ${nombreDeFois} Spam envoyés à ${args[0]}`);
-            
-            // Message de fin avec le dernier code
-            socket.sendMessage(sender, { 
-                text: `✅ *SPAM TERMINÉ !*\n\n📝 *Cible :* ${args[0]}\n🔢 *Total :* ${nombreDeFois} codes envoyés\n🔑 *Longueur :* 8 caractères\n⏱️ *Durée :* ${(compteur * intervalleSecondes).toFixed(0)} secondes\n\n📋 *Dernier code :* ${code}` 
-            }, { quoted: fakevCard });
-        }
-    }, intervalleSecondes * 1000);
-
-    break;
-}
-
-
-
-                
-        case 'traduit':
-        case 'traduction':
-        case 'translate':
-            await handleTraduction(socket, msg, sender, args, prefix, fakevCard, isOwner);
-            break;
-
-    }
+                }
+                    
         } catch (error) {
             console.error('Command handler error:', error);
             await socket.sendMessage(sender, {
