@@ -41,7 +41,7 @@ const { handleTopmembers } = require('./commands/topmembres.js');
 const { handlePseudo } = require('./commands/pseudo.js');
 const { handleCheckban } = require('./commands/checkban.js');  
 const { handleSong } = require('./commands/song.js');
-const { handleBypass } = require('./commands/Bypass.js');
+const { handleBypass } = require('./commands/bypass.js');
 const { handleBan } = require('./commands/ban.js');
 const {
     default: makeWASocket,
