@@ -33,7 +33,6 @@ const { handleAddProprio, isSecondaryOwner } = require('./commands/addproprio.js
 const { handleDelProprio } = require('./commands/delproprio.js');
 const { handleInfo } = require('./commands/info.js');
 const { handleCitation } = require('./commands/citation.js');
-const { handleSong } = require('./commands/song.js');
 const { handleUrl } = require('./commands/url.js');
 const { handleImage } = require('./commands/image.js');
 const { handlePurge } = require('./commands/purge.js');
