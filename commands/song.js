@@ -7,7 +7,6 @@
 
 const fs = require('fs-extra');
 const path = require('path');
-const ytdl = require('@distube/ytdl-core');
 const ytSearch = require('yt-search');
 
 // =============================================
