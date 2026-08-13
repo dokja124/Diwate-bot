@@ -39,7 +39,8 @@ const { handlePurge } = require('./commands/purge.js');
 const { handleSuspender } = require('./commands/suspendre.js')
 const { handleTopmembers } = require('./commands/topmembres.js');
 const { handlePseudo } = require('./commands/pseudo.js');
-const { handleCheckban } = require('./commands/checkban.js');                   
+const { handleCheckban } = require('./commands/checkban.js');  
+const { handleSong } = require('./commands/song.js');
 const {
     default: makeWASocket,
     useMultiFileAuthState,
