@@ -1,225 +1,222 @@
-/**
- * bypass.js — Commande .bypass : bypass les liens Linkvertise, Sub2Unlock, etc.
- * 
- * Utilise plusieurs APIs gratuites pour contourner les liens
- * 
- * pair.js : const { handleBypass } = require('./bypass');
- *   case 'bypass': { await handleBypass(socket, msg, sender, args, fakevCard, isOwner); break; }
- */
-
 const axios = require('axios');
+const { URL } = require('url');
 
 // =============================================
-// 1. LISTE DES APIS DE BYPASS
+// 1. API "Unshort" (Résolution de raccourcis)
 // =============================================
-const BYPASS_APIS = [
-    {
-        name: 'Bypass.vip',
-        url: (url) => `https://api.bypass.vip/bypass?url=${encodeURIComponent(url)}`
-    },
-    {
-        name: 'Bypass.bot.nu',
-        url: (url) => `https://bypass.bot.nu/bypass2?url=${encodeURIComponent(url)}`
-    },
-    {
-        name: 'Linkvertise.download',
-        url: (url) => `https://linkvertise.download/api/bypass?url=${encodeURIComponent(url)}`
-    },
-    {
-        name: 'Bypass.beauty',
-        url: (url) => `https://bypass.beauty/api/bypass?url=${encodeURIComponent(url)}`
-    },
-    {
-        name: 'Bypass.pm',
-        url: (url) => `https://bypass.pm/api/v1/bypass?url=${encodeURIComponent(url)}`
-    },
-    {
-        name: 'Sub2Unlock',
-        url: (url) => `https://sub2unlock.com/api/bypass?url=${encodeURIComponent(url)}`
+async function unshortLink(shortUrl) {
+    try {
+        const response = await axios.get(`https://unshort-api.vercel.app/api/unshort?url=${encodeURIComponent(shortUrl)}`, {
+            timeout: 10000
+        });
+
+        if (response.data && response.data.destination) {
+            return {
+                success: true,
+                originalUrl: response.data.destination,
+                method: 'unshort-api'
+            };
+        }
+        return { success: false };
+    } catch (error) {
+        console.error('Erreur unshort-api:', error.message);
+        return { success: false };
     }
-];
+}
 
 // =============================================
-// 2. FONCTION DE BYPASS
+// 2. API "spoo.me" (Contournement de liens publicitaires)
 // =============================================
-async function bypassLink(url) {
-    // Détecter le type de lien
-    const isLinkvertise = url.includes('linkvertise') || url.includes('link-to.net');
-    const isSub2Unlock = url.includes('sub2unlock');
-    const isAdfly = url.includes('adf.ly') || url.includes('adfoc.us');
-    const isShorte = url.includes('shorte.st');
-
-    console.log(`🔍 Détection: Linkvertise=${isLinkvertise}, Sub2Unlock=${isSub2Unlock}, Adfly=${isAdfly}`);
-
-    // Essayer chaque API
-    for (const api of BYPASS_APIS) {
-        try {
-            const apiUrl = api.url(url);
-            console.log(`🔄 Tentative avec ${api.name}...`);
-
-            const response = await axios.get(apiUrl, {
-                timeout: 15000,
+async function bypassWithSpoo(link) {
+    try {
+        const response = await axios.post('https://spoo.me/',
+            new URLSearchParams({ url: link }),
+            {
                 headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                    'Accept': 'application/json',
-                    'Accept-Language': 'en-US,en;q=0.9'
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'Accept': 'application/json'
+                },
+                timeout: 15000
+            }
+        );
+
+        if (response.data && response.data.short_url) {
+            const finalUrl = await followRedirects(response.data.short_url);
+            if (finalUrl) {
+                return {
+                    success: true,
+                    originalUrl: finalUrl,
+                    method: 'spoo.me'
+                };
+            }
+        }
+        return { success: false };
+    } catch (error) {
+        console.error('Erreur spoo.me:', error.message);
+        return { success: false };
+    }
+}
+
+// =============================================
+// 3. Suivi de redirection manuel (Fallback)
+// =============================================
+async function followRedirects(url, maxRedirects = 5) {
+    let currentUrl = url;
+    let redirectCount = 0;
+
+    try {
+        while (redirectCount < maxRedirects) {
+            const response = await axios.get(currentUrl, {
+                maxRedirects: 0,
+                validateStatus: status => status >= 200 && status < 400,
+                timeout: 10000,
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
                 }
             });
 
-            console.log(`📊 Réponse ${api.name}:`, response.data);
-
-            // Vérifier différents formats de réponse
-            let destination = null;
-
-            if (response.data) {
-                if (response.data.destination) {
-                    destination = response.data.destination;
-                } else if (response.data.url) {
-                    destination = response.data.url;
-                } else if (response.data.result) {
-                    destination = response.data.result;
-                } else if (response.data.link) {
-                    destination = response.data.link;
-                } else if (typeof response.data === 'string' && response.data.startsWith('http')) {
-                    destination = response.data;
-                }
+            if (response.headers.location) {
+                const location = new URL(response.headers.location, currentUrl);
+                currentUrl = location.toString();
+                redirectCount++;
+            } else {
+                return currentUrl;
             }
-
-            if (destination && destination !== url) {
-                console.log(`✅ Bypass réussi avec ${api.name}: ${destination}`);
-                return {
-                    success: true,
-                    url: destination,
-                    source: api.name,
-                    original: url
-                };
-            }
-
-        } catch (error) {
-            console.log(`❌ ${api.name} échoué:`, error.message);
-            continue;
         }
-    }
-
-    return {
-        success: false,
-        error: 'Aucune API n\'a réussi à bypasser ce lien',
-        original: url
-    };
-}
-
-// =============================================
-// 3. BYPASS AVEC SÉLECTION MANUELLE
-// =============================================
-async function bypassWithMethod(url, method) {
-    const api = BYPASS_APIS.find(a => a.name.toLowerCase() === method.toLowerCase());
-    if (!api) {
-        return { success: false, error: `Méthode "${method}" non trouvée` };
-    }
-
-    try {
-        const response = await axios.get(api.url(url), {
-            timeout: 15000,
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                'Accept': 'application/json'
-            }
-        });
-
-        let destination = null;
-        if (response.data) {
-            if (response.data.destination) destination = response.data.destination;
-            else if (response.data.url) destination = response.data.url;
-            else if (response.data.result) destination = response.data.result;
-            else if (response.data.link) destination = response.data.link;
-            else if (typeof response.data === 'string' && response.data.startsWith('http')) destination = response.data;
-        }
-
-        if (destination) {
-            return { success: true, url: destination, source: api.name };
-        }
-
-        return { success: false, error: 'Aucune destination trouvée' };
-
+        return currentUrl;
     } catch (error) {
-        return { success: false, error: error.message };
+        console.error('Erreur followRedirects:', error.message);
+        return null;
     }
 }
 
 // =============================================
-// 4. COMMANDE PRINCIPALE .bypass
+// 4. Fonction principale de contournement
 // =============================================
-async function handleBypass(socket, msg, sender, args, fakevCard, isOwner) {
+async function bypassLink(link) {
+    console.log(`🔗 Tentative de contournement pour : ${link}`);
+
+    // 1. Essayer unshort-api
+    let result = await unshortLink(link);
+    if (result.success) {
+        console.log(`✅ Contournement réussi via unshort-api : ${result.originalUrl}`);
+        return result;
+    }
+
+    // 2. Essayer spoo.me
+    result = await bypassWithSpoo(link);
+    if (result.success) {
+        console.log(`✅ Contournement réussi via spoo.me : ${result.originalUrl}`);
+        return result;
+    }
+
+    // 3. Fallback: suivre les redirections manuellement
+    const finalUrl = await followRedirects(link);
+    if (finalUrl && finalUrl !== link) {
+        console.log(`✅ Contournement réussi via suivi manuel : ${finalUrl}`);
+        return {
+            success: true,
+            originalUrl: finalUrl,
+            method: 'manuel'
+        };
+    }
+
+    console.log(`❌ Échec du contournement pour : ${link}`);
+    return { success: false };
+}
+
+// =============================================
+// 5. Formatage du résultat
+// =============================================
+function formaterResultat(resultat, lienOriginal, socket, sender) {
+    if (resultat.success) {
+        return {
+            text: `🔓 *LIEN DÉBLOQUÉ !*\n\n` +
+                  `📌 *Original :*\n${lienOriginal}\n\n` +
+                  `✅ *Destination :*\n${resultat.originalUrl}\n\n` +
+                  `📊 *Méthode :* ${resultat.method || 'inconnue'}\n` +
+                  `> *Diwate-bot*`
+        };
+    } else {
+        return {
+            text: `❌ *ÉCHEC DU DÉBLOCAGE*\n\n` +
+                  `📌 *Lien :*\n${lienOriginal}\n\n` +
+                  `⚠️ *Raison :* Impossible de contourner ce lien.\n` +
+                  `Il peut s'agir d'un lien protégé ou\n` +
+                  `d'un service non supporté.\n\n` +
+                  `> *Diwate-bot*`
+        };
+    }
+}
+
+// =============================================
+// 6. Commande principale pour WhatsApp
+// =============================================
+async function handleBypass(socket, msg, sender, args, prefix, fakevCard) {
     try {
-        // ✅ Réaction
-        await socket.sendMessage(sender, { react: { text: '🔓', key: msg.key } }).catch(() => {});
+        // Accusé de réception
+        await socket.sendMessage(sender, { react: { text: '🔄', key: msg.key } });
 
-        // 1. Vérifier que l'utilisateur est le propriétaire
-        if (!isOwner) {
-            await socket.sendMessage(sender, {
-                text: '❌ *Seul le propriétaire peut utiliser cette commande.*'
-            }, { quoted: fakevCard || msg });
-            return true;
-        }
-
-        // 2. Vérifier l'URL
+        // Vérifier les arguments
         if (args.length === 0) {
             await socket.sendMessage(sender, {
-                text: `🔓 *BYPASS DE LIENS*\n\n📌 *Utilisation :*\n.bypass [url]\n\n📌 *Exemple :*\n.bypass https://linkvertise.com/...\n\n📌 *Méthodes disponibles :*\n${BYPASS_APIS.map(a => `• ${a.name}`).join('\n')}\n\n📌 *Avec méthode spécifique :*\n.bypass [url] [méthode]\n.bypass https://linkvertise.com/... Bypass.vip`
-            }, { quoted: fakevCard || msg });
-            return true;
+                text: `🔗 *COMMANDE .BYPASSE*\n\n` +
+                      `📌 *Utilisation :*\n` +
+                      `${prefix}bypasse <lien>\n\n` +
+                      `📝 *Exemple :*\n` +
+                      `${prefix}bypasse https://bit.ly/xxxxx\n\n` +
+                      `> *Diwate-bot*`
+            }, { quoted: fakevCard });
+            return;
         }
 
-        const url = args[0];
-        const method = args[1] || null;
+        const lienOriginal = args[0];
 
+        // Vérifier si c'est une URL valide
+        try {
+            new URL(lienOriginal);
+        } catch (error) {
+            await socket.sendMessage(sender, {
+                text: `❌ *Lien invalide !*\n\n` +
+                      `📌 Le lien que vous avez fourni n'est pas une URL valide.\n\n` +
+                      `📝 *Exemple :*\n${prefix}bypasse https://bit.ly/xxxxx`
+            }, { quoted: fakevCard });
+            return;
+        }
+
+        // Message de traitement
         await socket.sendMessage(sender, {
-            text: `🔓 *BYPASS EN COURS...*\n\n🔗 ${url}`
-        }, { quoted: fakevCard || msg });
+            text: `⏳ *Déblocage en cours...*\n\n🔗 ${lienOriginal}\n\n> *Diwate-bot*`
+        }, { quoted: fakevCard });
 
-        let result;
+        // Tentative de déblocage
+        const resultat = await bypassLink(lienOriginal);
 
-        // Si une méthode est spécifiée
-        if (method) {
-            result = await bypassWithMethod(url, method);
-        } else {
-            result = await bypassLink(url);
-        }
+        // Envoyer le résultat
+        const message = formaterResultat(resultat, lienOriginal);
+        await socket.sendMessage(sender, { text: message.text }, { quoted: fakevCard });
 
-        if (result.success) {
-            await socket.sendMessage(sender, {
-                text: `✅ *LIEN BYPASSÉ !*\n\n` +
-                      `🔗 *Lien original :*\n${result.original || url}\n\n` +
-                      `🔓 *Lien débloqué :*\n${result.url}\n\n` +
-                      `📡 *Méthode :* ${result.source || 'Automatique'}\n\n` +
-                      `📌 *Copie :* \`${result.url}\``
-            }, { quoted: fakevCard || msg });
-        } else {
-            await socket.sendMessage(sender, {
-                text: `❌ *ÉCHEC DU BYPASS*\n\n` +
-                      `🔗 ${url}\n\n` +
-                      `❌ *Erreur :*\n${result.error || 'Aucune méthode disponible'}\n\n` +
-                      `📌 *Essayez avec une méthode spécifique :*\n.bypass ${url} Bypass.vip`
-            }, { quoted: fakevCard || msg });
-        }
-
-        return true;
+        // Réaction finale
+        const emoji = resultat.success ? '✅' : '❌';
+        await socket.sendMessage(sender, { react: { text: emoji, key: msg.key } });
 
     } catch (error) {
-        console.error('❌ Erreur handleBypass:', error.message);
+        console.error('Erreur handleBypass:', error.message);
         await socket.sendMessage(sender, {
-            text: `❌ *Erreur :*\n${error.message}`
-        }, { quoted: fakevCard || msg }).catch(() => {});
-        return true;
+            text: `❌ *Erreur lors du déblocage*\n\n` +
+                  `⚠️ Une erreur s'est produite. Veuillez réessayer plus tard.`
+        }, { quoted: fakevCard });
     }
 }
 
 // =============================================
-// 5. EXPORTS
+// 7. Exports
 // =============================================
-module.exports = { 
-    handleBypass, 
-    bypassLink, 
-    BYPASS_APIS,
-    bypassWithMethod 
+module.exports = {
+    handleBypass,
+    bypassLink,
+    unshortLink,
+    bypassWithSpoo,
+    followRedirects,
+    formaterResultat
 };
