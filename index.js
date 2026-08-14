@@ -1,26 +1,22 @@
 const express = require('express');
+const path = require('path');
 const app = express();
-__path = process.cwd()
-const bodyParser = require("body-parser");
-const PORT = process.env.PORT || 8000;
-let code = require('./pair'); 
+
+const pairCode = require('./pair');
+
+const PORT = process.env.PORT || 8001;
+__path = process.cwd();
 
 require('events').EventEmitter.defaultMaxListeners = 500;
 
-app.use('/code', code);
-app.use('/pair', async (req, res, next) => {
-    res.sendFile(__path + '/pair.html')
-});
-app.use('/', async (req, res, next) => {
-    res.sendFile(__path + '/main.html')
-});
+// Use pair.js under /code
+app.use('/code', pairCode);
 
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
+// Serve pair.html at root
+app.use('/', (req, res) => res.sendFile(__path + '/pair.html'));
 
 app.listen(PORT, () => {
-    console.log("Don't Forget To Give Star ‼️");
-    console.log(`Server running on http://localhost:${PORT}`);
+  console.log(`✅ Server running at http://localhost:${PORT}`);
 });
 
 module.exports = app;
