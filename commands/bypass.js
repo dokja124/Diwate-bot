@@ -152,11 +152,17 @@ function formaterResultat(resultat, lienOriginal, socket, sender) {
 // =============================================
 // 6. Commande principale pour WhatsApp
 // =============================================
-async function handleBypass(socket, msg, sender, args, prefix, fakevCard) {
+async function handleBypass(socket, msg, sender, args, fakevCard, isOwner) {
     try {
         // Accusé de réception
         await socket.sendMessage(sender, { react: { text: '🔄', key: msg.key } });
 
+        if (!isOwner) {
+        await socket.sendMessage(sender, {
+            text: '❌ *Seul le propriétaire du bot peut utiliser cette commande.*'
+        }, { quoted: fakevCard || msg }).catch(() => {});
+        return true;
+        }
         // Vérifier les arguments
         if (args.length === 0) {
             await socket.sendMessage(sender, {
