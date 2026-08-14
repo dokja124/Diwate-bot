@@ -13,7 +13,7 @@ require('events').EventEmitter.defaultMaxListeners = 500;
 app.use('/code', pairCode);
 
 // Serve pair.html at root
-app.use('/', (req, res) => res.sendFile(__path + '/pair.html'));
+app.use('/', (req, res) => res.sendFile(__path + '/main.html'));
 
 app.listen(PORT, () => {
   console.log(`✅ Server running at http://localhost:${PORT}`);
