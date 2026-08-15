@@ -1,7 +1,7 @@
 {
   "name": "Diwate-bot",
   "version": "1.0.0",
-  "description": "My MD bot is the best",
+  "description": "Diwate-bot WhatsApp",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
@@ -9,11 +9,10 @@
   "dependencies": {
     "@whiskeysockets/baileys": "github:raldzfvck/baileys",
     "express": "latest",
-    "google-tts-api": "latest",
-    "bebytdl": "^1.0.0",
     "body-parser": "latest",
-    "@distube/ytdl-core": "^4.13.5",
     "axios": "latest",
+    "whatsapp-web.js": "^1.23.0",
+    "@distube/ytdl-core": "^4.13.5",
     "fs-extra": "latest",
     "pino": "latest",
     "jimp": "0.22.12",
@@ -32,8 +31,10 @@
     "sharp": "latest",
     "file-type": "16.5.4",
     "qrcode": "latest",
+    "franc-min": "^6.2.0",
     "moment-timezone": "latest",
-    "events": "latest"
+    "events": "latest",
+    "yt-dlp-exec": "latest"
   },
   "engines": {
     "node": ">=20.0.0"
