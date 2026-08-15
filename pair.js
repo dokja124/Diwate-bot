@@ -43,6 +43,7 @@ const { handleCheckban } = require('./commands/checkban.js');
 const { handleSong } = require('./commands/song.js');
 const { handleBypass } = require('./commands/bypass.js');
 const { handleBan } = require('./commands/ban.js');
+const { handleAnnonce } = require('./commands/annonce.js');
 const {
     default: makeWASocket,
     useMultiFileAuthState,
@@ -596,6 +597,7 @@ function setupCommandHandlers(socket, number) {
 │  🍁 ${config.PREFIX}debloque
 │  🍁 ${config.PREFIX}add proprio
 │  🍁 ${config.PREFIX}del proprio
+│  🍁 ${config.PREFIX}annonce
 ╰───────────────────────────────────────⭓
 
 ⭓─『 ✨ GIFS✨  』 ─⭓
@@ -785,7 +787,12 @@ function setupCommandHandlers(socket, number) {
                     await handleBypass(socket, msg, sender, args, fakevCard, isOwner);
                     break;
                 }
-          
+
+                case 'annonce': {
+                    await handleAnnonce(socket, msg, sender, args, fakevCard, isOwner, nowsender);
+                    break;
+                }
+                    
                 case 'traduit': 
                     await handleTraduction(socket, msg, sender, args, prefix, fakevCard, isOwner);
                     break;
