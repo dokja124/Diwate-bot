@@ -1,275 +1,245 @@
 /**
- * song.js — Téléchargement et envoi de chansons/musiques
- * Utilisation : .song <titre> ou .song <lien YouTube>
+ * song.js — Commande .song : télécharge des chansons COMPLÈTES
+ * Utilise yt-dlp pour une qualité maximale (320kbps)
  * 
- * 📦 Utilise bebytdl pour le téléchargement (stable et fiable)
- * Installation : npm install bebytdl yt-search axios fs-extra
+ * Installation : npm install yt-dlp-exec yt-search fs-extra
+ * 
+ * pair.js : const { handleSong } = require('./song');
+ *   case 'song': { await handleSong(socket, msg, sender, args, fakevCard); break; }
  */
 
-const axios = require('axios');
 const fs = require('fs-extra');
 const path = require('path');
-const bebytdl = require('bebytdl');
 const ytSearch = require('yt-search');
+const { exec } = require('yt-dlp-exec');
+
+const TEMP_DIR = path.join(__dirname, 'temp');
+if (!fs.existsSync(TEMP_DIR)) fs.mkdirSync(TEMP_DIR, { recursive: true });
 
 // =============================================
-// 1. RECHERCHER UNE CHANSON SUR YOUTUBE
+// 1. FONCTIONS UTILITAIRES
 // =============================================
+
+function sanitizeFileName(title) {
+    return title.replace(/[^\w\s-]/gi, '').replace(/\s+/g, '_').substring(0, 50);
+}
+
+function formatDuration(seconds) {
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60);
+    return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+function delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function cleanupTempFiles() {
+    try {
+        const files = fs.readdirSync(TEMP_DIR);
+        const now = Date.now();
+        const MAX_AGE = 3600000; // 1 heure
+        files.forEach(file => {
+            const filePath = path.join(TEMP_DIR, file);
+            const stats = fs.statSync(filePath);
+            if (now - stats.mtimeMs > MAX_AGE) {
+                fs.unlinkSync(filePath);
+                console.log(`🗑️ Fichier temporaire supprimé: ${file}`);
+            }
+        });
+    } catch (error) {
+        console.error('Erreur nettoyage temp:', error.message);
+    }
+}
+
+setInterval(cleanupTempFiles, 3600000);
+
+// =============================================
+// 2. RECHERCHE DE LA CHANSON
+// =============================================
+
 async function searchSong(query) {
     try {
+        console.log(`🔍 Recherche: ${query}`);
         const result = await ytSearch(query);
-        const videos = result.videos;
         
-        if (!videos || videos.length === 0) {
-            throw new Error('Aucune chanson trouvée.');
+        if (!result || !result.videos || result.videos.length === 0) {
+            throw new Error('Aucune chanson trouvée');
         }
 
-        const video = videos[0];
+        // Prendre le premier résultat (le plus pertinent)
+        const video = result.videos[0];
+        
+        console.log(`✅ Trouvé: ${video.title} - ${video.author.name}`);
+        console.log(`⏱️ Durée: ${formatDuration(video.duration.seconds)}`);
+
         return {
             title: video.title,
             url: video.url,
-            duration: video.duration,
-            thumbnail: video.thumbnail,
+            duration: video.duration.seconds,
+            durationFormatted: formatDuration(video.duration.seconds),
+            views: video.views,
             author: video.author.name
         };
+
     } catch (error) {
         console.error('❌ Erreur recherche:', error.message);
-        throw new Error('Impossible de rechercher la chanson.');
+        throw error;
     }
 }
 
 // =============================================
-// 2. TÉLÉCHARGER UNE CHANSON AVEC BEBYTDL
+// 3. TÉLÉCHARGEMENT COMPLET
 // =============================================
-async function downloadSong(url) {
+
+async function downloadSong(url, title) {
     try {
-        console.log(`🎵 Téléchargement avec bebytdl : ${url}`);
+        const fileName = `${sanitizeFileName(title)}.mp3`;
+        const filePath = path.join(TEMP_DIR, fileName);
 
-        const result = await bebytdl.downloadAudio(url, {
-            quality: 'high',
-            format: 'mp3'
-        });
-
-        if (!result.success) {
-            throw new Error(result.error || 'Échec du téléchargement');
+        // Vérifier si le fichier existe déjà
+        if (fs.existsSync(filePath)) {
+            const stats = fs.statSync(filePath);
+            if (stats.size > 1024 * 1024) { // > 1MB = complet
+                console.log(`✅ Fichier déjà existant: ${fileName}`);
+                return filePath;
+            }
         }
 
-        const data = result.data;
-        const title = data.title.replace(/[^a-zA-Z0-9]/g, '_');
-        
-        if (!fs.existsSync('./temp')) {
-            fs.mkdirSync('./temp', { recursive: true });
+        console.log(`📥 Téléchargement complet: ${title}`);
+
+        // 🔥 TÉLÉCHARGEMENT COMPLET AVEC yt-dlp
+        await exec(url, {
+            extractAudio: true,
+            audioFormat: 'mp3',
+            audioQuality: 0,           // Meilleure qualité (320kbps)
+            output: filePath,
+            noCheckCertificates: true,
+            noWarnings: true,
+            preferFreeFormats: true,
+            addHeader: [
+                'referer:youtube.com',
+                'user-agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            ]
+        });
+
+        // Vérifier que le fichier a bien été créé
+        if (!fs.existsSync(filePath)) {
+            throw new Error('Le fichier n\'a pas été créé');
         }
 
-        const outputPath = path.join('./temp', `${title}.mp3`);
-        
-        const response = await axios({
-            method: 'get',
-            url: data.downloadLinks[0].url,
-            responseType: 'stream',
-            timeout: 60000
-        });
-
-        const writer = fs.createWriteStream(outputPath);
-        response.data.pipe(writer);
-
-        return new Promise((resolve, reject) => {
-            writer.on('finish', () => {
-                console.log(`✅ Téléchargement terminé : ${outputPath}`);
-                resolve({
-                    path: outputPath,
-                    title: data.title,
-                    filename: path.basename(outputPath),
-                    duration: data.duration,
-                    author: data.author.name
-                });
-            });
-            
-            writer.on('error', (error) => {
-                reject(error);
-            });
-            
-            response.data.on('error', (error) => {
-                reject(error);
-            });
-        });
+        const stats = fs.statSync(filePath);
+        console.log(`✅ Téléchargement terminé: ${fileName} (${(stats.size/1024/1024).toFixed(1)}MB)`);
+        return filePath;
 
     } catch (error) {
-        console.error('❌ Erreur téléchargement bebytdl:', error.message);
-        throw new Error(`Impossible de télécharger la chanson : ${error.message}`);
+        console.error('❌ Erreur téléchargement:', error.message);
+        throw error;
     }
 }
 
 // =============================================
-// 3. TÉLÉCHARGER UNE CHANSON AVEC YT-DLP (FALLBACK)
+// 4. COMMANDE PRINCIPALE .song
 // =============================================
-async function downloadSongFallback(url) {
-    const { exec } = require('child_process');
-    
-    return new Promise((resolve, reject) => {
-        const outputTemplate = './temp/%(title)s.%(ext)s';
-        const command = `yt-dlp -x --audio-format mp3 --audio-quality 0 -o "${outputTemplate}" ${url}`;
-        
-        exec(command, (error, stdout, stderr) => {
-            if (error) {
-                reject(error);
-                return;
-            }
-            
-            const files = fs.readdirSync('./temp');
-            const mp3Files = files.filter(f => f.endsWith('.mp3'));
-            
-            if (mp3Files.length === 0) {
-                reject(new Error('Aucun fichier MP3 trouvé'));
-                return;
-            }
-            
-            const latestFile = mp3Files[mp3Files.length - 1];
-            const filePath = path.join('./temp', latestFile);
-            
-            resolve({
-                path: filePath,
-                title: path.basename(latestFile, '.mp3'),
-                filename: latestFile
-            });
-        });
-    });
-}
 
-// =============================================
-// 4. FORMATER LA DURÉE
-// =============================================
-function formatDuration(seconds) {
-    if (!seconds) return '00:00';
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = Math.floor(seconds % 60);
-    
-    if (hours > 0) {
-        return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-    }
-    return `${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-}
-
-// =============================================
-// 5. ENVOYER LA CHANSON DANS WHATSAPP
-// =============================================
-async function sendSong(socket, sender, songPath, title, caption = '') {
+async function handleSong(socket, msg, sender, args, fakevCard) {
     try {
-        const audioBuffer = fs.readFileSync(songPath);
-        
-        await socket.sendMessage(sender, {
-            audio: audioBuffer,
-            mimetype: 'audio/mpeg',
-            fileName: `${title}.mp3`,
-            caption: caption || `🎵 *${title}*\n\n> *Diwate-bot*`
-        });
-        
-        console.log(`✅ Chanson envoyée : ${title}`);
-        return true;
-    } catch (error) {
-        console.error('❌ Erreur envoi audio:', error.message);
-        throw new Error('Impossible d\'envoyer la chanson.');
-    }
-}
+        // ✅ Réaction
+        await socket.sendMessage(sender, { react: { text: '🎵', key: msg.key } }).catch(() => {});
 
-// =============================================
-// 6. COMMANDE PRINCIPALE .song
-// =============================================
-async function handleSong(socket, msg, sender, args, prefix, fakevCard, isOwner) {
-    try {
-        // ✅ RÉACTION AVEC L'EMOJI 🎵 SUR LE MESSAGE
-        await socket.sendMessage(sender, { react: { text: '🎵', key: msg.key } });
-
-        // Vérifier les arguments
-        if (args.length === 0) {
+        if (!args || args.length === 0) {
             await socket.sendMessage(sender, {
-                text: `🎵 *COMMANDE .SONG*\n\n📌 *Utilisation :*\n.song <titre de la chanson>\n.song <lien YouTube>\n\n📝 *Exemples :*\n.song Never Gonna Give You Up\n.song https://youtu.be/dQw4w9WgXcQ\n\n⚡ *Téléchargement rapide et fiable*`
+                text: '🎵 *Téléchargement de chanson complète*\n\n' +
+                      '📌 *Utilisation :*\n.song [titre]\n\n' +
+                      '📌 *Exemples :*\n.song Adele Hello\n.song Daft Punk Get Lucky\n\n' +
+                      '⚡ *Qualité :* 320kbps (max)'
             }, { quoted: fakevCard || msg });
             return true;
         }
 
         const query = args.join(' ');
-        let videoUrl = query;
-        let videoInfo = null;
-
-        // Vérifier si c'est un lien YouTube
-        const isUrl = query.includes('youtu.be') || query.includes('youtube.com');
         
-        if (isUrl) {
-            videoInfo = {
-                title: query,
-                url: query,
-                author: 'YouTube'
-            };
-        } else {
-            try {
-                await socket.sendMessage(sender, {
-                    text: `🔍 *Recherche :* ${query}\n\n⏳ Recherche en cours...`
-                }, { quoted: fakevCard || msg });
-
-                videoInfo = await searchSong(query);
-            } catch (error) {
-                await socket.sendMessage(sender, {
-                    text: `❌ *Aucune chanson trouvée pour :* "${query}"`
-                }, { quoted: fakevCard || msg });
-                return true;
-            }
-        }
-
-        // Message de début de téléchargement
+        // Message de recherche
         await socket.sendMessage(sender, {
-            text: `⏳ *Téléchargement en cours...*\n\n🎵 *Titre :* ${videoInfo.title}\n👤 *Artiste :* ${videoInfo.author || 'Inconnu'}\n\n⏰ Cela peut prendre quelques instants...`
+            text: `🔍 *Recherche :* ${query}`
         }, { quoted: fakevCard || msg });
 
+        // 1. Rechercher la chanson
+        let songInfo;
         try {
-            let song;
-            
-            try {
-                song = await downloadSong(videoInfo.url);
-            } catch (bebytdlError) {
-                console.warn('⚠️ bebytdl a échoué, fallback vers yt-dlp...');
-                song = await downloadSongFallback(videoInfo.url);
-            }
-            
-            const caption = `🎵 *${song.title}*\n👤 *Artiste :* ${videoInfo.author || 'Inconnu'}\n⏱️ *Durée :* ${formatDuration(song.duration)}\n\n> *Diwate-bot*`;
-            
-            await sendSong(socket, sender, song.path, song.title, caption);
-            
-            if (fs.existsSync(song.path)) {
-                fs.unlinkSync(song.path);
-                console.log(`🗑️ Fichier temporaire supprimé : ${song.path}`);
-            }
-
-            // ✅ RÉACTION FINALE AVEC L'EMOJI ✅
-            await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
-
+            songInfo = await searchSong(query);
         } catch (error) {
             await socket.sendMessage(sender, {
-                text: `❌ *Erreur lors du téléchargement :*\n${error.message}\n\n💡 Essayez un autre titre ou lien.`
+                text: `❌ *Erreur de recherche :*\n${error.message}`
             }, { quoted: fakevCard || msg });
-            return true;
+            return false;
+        }
+
+        // Message de téléchargement
+        await socket.sendMessage(sender, {
+            text: `📥 *Téléchargement complet...*\n\n` +
+                  `🎵 *${songInfo.title}*\n` +
+                  `👤 *${songInfo.author}*\n` +
+                  `⏱️ *${songInfo.durationFormatted}*\n` +
+                  `👁️ *${songInfo.views.toLocaleString()} vues*\n\n` +
+                  `⏳ Peut prendre 10-30 secondes...`
+        }, { quoted: fakevCard || msg });
+
+        // 2. Télécharger la chanson
+        let filePath;
+        try {
+            filePath = await downloadSong(songInfo.url, songInfo.title);
+        } catch (error) {
+            await socket.sendMessage(sender, {
+                text: `❌ *Erreur de téléchargement :*\n${error.message}`
+            }, { quoted: fakevCard || msg });
+            return false;
+        }
+
+        // Vérifier que le fichier existe
+        if (!fs.existsSync(filePath)) {
+            await socket.sendMessage(sender, {
+                text: '❌ *Erreur :* Le fichier audio n\'a pas pu être généré.'
+            }, { quoted: fakevCard || msg });
+            return false;
+        }
+
+        // 3. Lire le fichier
+        const audioBuffer = await fs.readFile(filePath);
+        const stats = fs.statSync(filePath);
+        const fileName = path.basename(filePath);
+        
+        console.log(`📤 Envoi: ${fileName} (${(stats.size/1024/1024).toFixed(1)}MB)`);
+
+        // 4. Envoyer l'audio
+        await socket.sendMessage(sender, {
+            audio: audioBuffer,
+            mimetype: 'audio/mpeg',
+            fileName: `${songInfo.title} - ${songInfo.author}.mp3`,
+            caption: `🎵 *${songInfo.title}*\n` +
+                     `👤 *${songInfo.author}*\n` +
+                     `⏱️ *${songInfo.durationFormatted}*\n` +
+                     `👁️ *${songInfo.views.toLocaleString()} vues*\n` +
+                     `📥 *Chanson complète 320kbps*`
+        }, { quoted: fakevCard || msg });
+
+        // 5. Supprimer le fichier temporaire
+        try {
+            fs.unlinkSync(filePath);
+            console.log(`🗑️ Fichier supprimé: ${fileName}`);
+        } catch (error) {
+            console.error('Erreur suppression fichier:', error.message);
         }
 
         return true;
 
     } catch (error) {
-        console.error('❌ Erreur handleSong:', error.message);
+        console.error('❌ Erreur handleSong:', error);
         await socket.sendMessage(sender, {
-            text: `❌ *Erreur :*\n${error.message}`
-        }, { quoted: fakevCard || msg });
-        return true;
+            text: `❌ *Erreur inattendue :*\n${error.message}`
+        }, { quoted: fakevCard || msg }).catch(() => {});
+        return false;
     }
 }
 
-// =============================================
-// 7. EXPORTS
-// =============================================
-module.exports = { 
-    handleSong, 
-    searchSong, 
-    downloadSong, 
-    downloadSongFallback,
-    sendSong,
-    formatDuration
-};
+module.exports = { handleSong };
