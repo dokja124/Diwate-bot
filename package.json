@@ -9,7 +9,9 @@
   "dependencies": {
     "@whiskeysockets/baileys": "github:raldzfvck/baileys",
     "express": "latest",
+    "google-tts-api": "latest",
     "body-parser": "latest",
+    "@distube/ytdl-core": "^4.13.5",
     "axios": "latest",
     "fs-extra": "latest",
     "pino": "latest",
