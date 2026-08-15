@@ -142,7 +142,7 @@ async function downloadSong(url, title) {
 // 4. COMMANDE PRINCIPALE .song
 // =============================================
 
-async function handleSong(socket, msg, sender, args, fakevCard) {
+async function handleSong(socket, msg, sender, nowsender, args, fakevCard) {
     try {
         // ✅ Réaction
         await socket.sendMessage(sender, { react: { text: '🎵', key: msg.key } }).catch(() => {});
