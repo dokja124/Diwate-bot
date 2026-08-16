@@ -738,7 +738,7 @@ function setupCommandHandlers(socket, number) {
                 }
                 // case: song - télécharger audio
                 case 'song': {
-                    await handleSong(socket, msg, sender, args, fakevCard);
+                    await handleSong(socket, msg, sender, nowsender, args, fakevCard);
                     break;
                 }
                 // En haut du fichier
