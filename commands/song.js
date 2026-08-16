@@ -10,7 +10,6 @@ const axios = require('axios');
 const yts = require('yt-search');
 const fs = require('fs-extra');
 const path = require('path');
-const { toAudio } = require('../lib/converter');
 
 // =============================================
 // 1. CONFIGURATION
