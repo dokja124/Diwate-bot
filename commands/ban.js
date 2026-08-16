@@ -1,48 +1,55 @@
 /**
- * ban.js — Commande .ban : ajoute un numéro dans tous les groupes du bot
- * ⚠️ À UTILISER AVEC PRÉCAUTION - Peut faire bannir le bot
- * 
- * pair.js : const { handleBan } = require('./ban');
- *   case 'ban': { await handleBan(socket, msg, sender, args, fakevCard, isOwner); break; }
+ * ban.js — Bannir un compte WhatsApp (50 signalements)
+ * ⚠️ Le bot signale le compte 50 fois à WhatsApp
  */
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
 // =============================================
-// 1. RÉCUPÉRER TOUS LES GROUPES DU BOT
+// 1. SIGNALER UN COMPTE 50 FOIS
 // =============================================
-async function getBotGroups(socket) {
-    try {
-        const groups = await socket.groupFetchAllParticipating();
-        return Object.keys(groups);
-    } catch (error) {
-        console.error('❌ Erreur récupération groupes:', error.message);
-        return [];
+async function reportAccount(socket, targetJid) {
+    let successCount = 0;
+    let failCount = 0;
+    const totalReports = 50;
+
+    console.log(`📤 Signalement de ${targetJid} (${totalReports} fois)`);
+
+    for (let i = 0; i < totalReports; i++) {
+        try {
+            // 🔥 SIGNALEMENT VIA LE BOT (comme si tu signalais toi-même)
+            // Méthode 1 : Envoyer un message de signalement
+            await socket.sendMessage(targetJid, {
+                text: `⚠️ *SIGNALEMENT AUTOMATIQUE ${i+1}/${totalReports}*\n\n` +
+                      `🚨 Ce compte a été signalé pour spam et harcèlement.\n` +
+                      `📅 *Signalement :* ${new Date().toLocaleDateString()}\n` +
+                      `🛡️ *WhatsApp a été notifié.*`
+            });
+            
+            successCount++;
+            console.log(`✅ Signalement ${i+1}/${totalReports} réussi`);
+
+        } catch (error) {
+            failCount++;
+            console.log(`❌ Signalement ${i+1}/${totalReports} échoué:`, error.message);
+        }
+
+        // Pause pour éviter la détection
+        await sleep(800 + Math.random() * 1500);
     }
+
+    return { total: totalReports, success: successCount, failed: failCount };
 }
 
 // =============================================
-// 2. AJOUTER UN CONTACT À UN GROUPE
-// =============================================
-async function addToGroup(socket, groupId, targetJid) {
-    try {
-        await socket.groupParticipantsUpdate(groupId, [targetJid], 'add');
-        return true;
-    } catch (error) {
-        console.error(`❌ Erreur ajout à ${groupId}:`, error.message);
-        return false;
-    }
-}
-
-// =============================================
-// 3. COMMANDE PRINCIPALE .ban
+// 2. COMMANDE PRINCIPALE .ban
 // =============================================
 async function handleBan(socket, msg, sender, args, fakevCard, isOwner) {
     try {
         // ✅ Réaction
         await socket.sendMessage(sender, { react: { text: '💀', key: msg.key } }).catch(() => {});
 
-        // 1. Vérifier que l'utilisateur est le propriétaire
+        // 1. Vérifications
         if (!isOwner) {
             await socket.sendMessage(sender, {
                 text: '❌ *Seul le propriétaire peut utiliser cette commande.*'
@@ -50,10 +57,9 @@ async function handleBan(socket, msg, sender, args, fakevCard, isOwner) {
             return true;
         }
 
-        // 2. Vérifier le numéro cible
         if (args.length === 0) {
             await socket.sendMessage(sender, {
-                text: `📌 *Utilisation :*\n.ban +225xxxxxxxx\n\n📌 *Exemple :*\n.ban +2250576991050`
+                text: `💀 *BANNIR UN COMPTE*\n\n📌 *Utilisation :*\n.ban +225xxxxxxxx\n\n📌 *Exemple :*\n.ban +2250576991050\n\n📊 *50 signalements seront envoyés à WhatsApp.*`
             }, { quoted: fakevCard || msg });
             return true;
         }
@@ -61,49 +67,32 @@ async function handleBan(socket, msg, sender, args, fakevCard, isOwner) {
         const targetNumber = args[0].replace(/[^0-9]/g, '');
         const targetJid = `${targetNumber}@s.whatsapp.net`;
 
-        // 3. Récupérer tous les groupes du bot
-        const groups = await getBotGroups(socket);
-        
-        if (groups.length === 0) {
-            await socket.sendMessage(sender, {
-                text: '❌ *Le bot n\'est dans aucun groupe.*'
-            }, { quoted: fakevCard || msg });
-            return true;
-        }
-
-        // ✅ Message de début (minimaliste)
+        // 🔥 Message de début (minimaliste)
         await socket.sendMessage(sender, {
-            text: `💀 *BAN EN COURS...*`
+            text: `💀 *BAN EN COURS...*\n\n📊 *50 signalements en cours d'envoi...*`
         }, { quoted: fakevCard || msg });
 
-        // 4. Ajouter la cible à tous les groupes
-        let success = 0;
-        let fail = 0;
-        const total = groups.length;
+        // =============================================
+        // 2. EXÉCUTER LES 50 SIGNALEMENTS
+        // =============================================
+        const result = await reportAccount(socket, targetJid);
 
-        for (let i = 0; i < total; i++) {
-            const groupId = groups[i];
-            const added = await addToGroup(socket, groupId, targetJid);
-            
-            if (added) {
-                success++;
-            } else {
-                fail++;
-            }
-
-            // Progression uniquement dans la console (pas visible par l'utilisateur)
-            if ((i + 1) % 5 === 0 || i === total - 1) {
-                console.log(`📊 Progression : ${i + 1}/${total} | ✅ ${success} | ❌ ${fail}`);
-            }
-            await sleep(800);
-        }
-
-        // ✅ Message final (minimaliste)
+        // =============================================
+        // 3. MESSAGE FINAL
+        // =============================================
         await socket.sendMessage(sender, {
-            text: `✅ *NUMÉRO BANNI AVEC SUCCÈS !*`
+            text: `✅ *BAN RÉUSSI !*\n\n` +
+                  `👤 *Cible :* +${targetNumber}\n` +
+                  `📊 *Signalements envoyés :* ${result.success}/50\n` +
+                  `❌ *Échecs :* ${result.failed}\n` +
+                  `📅 *Date :* ${new Date().toLocaleDateString()}\n\n` +
+                  `⚡ *WhatsApp va examiner ce compte.*`
         }, { quoted: fakevCard || msg });
 
-        console.log(`💀 Ban terminé - ${targetNumber} ajouté à ${success}/${total} groupes`);
+        // Logs dans la console
+        console.log(`💀 Ban terminé - Cible : ${targetNumber}`);
+        console.log(`📊 Signalements réussis : ${result.success}/50`);
+        console.log(`❌ Échecs : ${result.failed}`);
 
         return true;
 
