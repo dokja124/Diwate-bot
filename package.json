@@ -33,7 +33,7 @@
     "cheerio": "latest",
     "ruhend-scraper": "latest",
     "youtubedl-core": "^4.11.7",
-    "ytdl-core": "^4.11.5"
+    "ytdl-core": "^4.11.5",
     "yt-search": "latest",
     "node-fetch": "2.7.0",
     "sharp": "latest",
