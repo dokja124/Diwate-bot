@@ -1,323 +1,207 @@
-const axios = require('axios');
-
-// =============================================
-// 0. EN-TÊTES POUR CONTOURNER CLOUDFLARE
-// =============================================
-const HEADERS = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-    'Accept-Language': 'fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7',
-    'Accept-Encoding': 'gzip, deflate, br',
-    'Connection': 'keep-alive',
-    'Sec-Fetch-Dest': 'document',
-    'Sec-Fetch-Mode': 'navigate',
-    'Sec-Fetch-Site': 'none',
-    'Sec-Fetch-User': '?1',
-    'Upgrade-Insecure-Requests': '1'
-};
-
-// Détection de langue locale
-let franc = null;
-try {
-    franc = require('franc-min').franc;
-} catch (e) {
-    console.warn('⚠️ franc-min non installé (npm install franc-min)');
-}
+const fetch = require('node-fetch');
 
 // =============================================
 // 1. LANGUES DISPONIBLES
 // =============================================
+
 const LANGUES = {
-    'français': { code: 'fr', emoji: '🇫🇷', nomAnglais: 'French' },
-    'anglais': { code: 'en', emoji: '🇬🇧', nomAnglais: 'English' },
-    'espagnol': { code: 'es', emoji: '🇪🇸', nomAnglais: 'Spanish' },
-    'japonais': { code: 'ja', emoji: '🇯🇵', nomAnglais: 'Japanese' },
-    'allemand': { code: 'de', emoji: '🇩🇪', nomAnglais: 'German' },
-    'italien': { code: 'it', emoji: '🇮🇹', nomAnglais: 'Italian' },
-    'portugais': { code: 'pt', emoji: '🇵🇹', nomAnglais: 'Portuguese' },
-    'chinois': { code: 'zh', emoji: '🇨🇳', nomAnglais: 'Chinese' },
-    'coréen': { code: 'ko', emoji: '🇰🇷', nomAnglais: 'Korean' },
-    'arabe': { code: 'ar', emoji: '🇸🇦', nomAnglais: 'Arabic' },
-    'russe': { code: 'ru', emoji: '🇷🇺', nomAnglais: 'Russian' },
-    'créole haïtien': { code: 'ht', emoji: '🇭🇹', nomAnglais: 'Haitian Creole' },
-    'créole': { code: 'ht', emoji: '🇭🇹', nomAnglais: 'Haitian Creole' },
-    'ht': { code: 'ht', emoji: '🇭🇹', nomAnglais: 'Haitian Creole' },
-    'néerlandais': { code: 'nl', emoji: '🇳🇱', nomAnglais: 'Dutch' },
-    'turc': { code: 'tr', emoji: '🇹🇷', nomAnglais: 'Turkish' },
-    'hindi': { code: 'hi', emoji: '🇮🇳', nomAnglais: 'Hindi' },
-    'indonésien': { code: 'id', emoji: '🇮🇩', nomAnglais: 'Indonesian' },
-    'vietnamien': { code: 'vi', emoji: '🇻🇳', nomAnglais: 'Vietnamese' },
-    'thaïlandais': { code: 'th', emoji: '🇹🇭', nomAnglais: 'Thai' },
-    'fr': { code: 'fr', emoji: '🇫🇷', nomAnglais: 'French' },
-    'en': { code: 'en', emoji: '🇬🇧', nomAnglais: 'English' },
-    'es': { code: 'es', emoji: '🇪🇸', nomAnglais: 'Spanish' },
-    'ja': { code: 'ja', emoji: '🇯🇵', nomAnglais: 'Japanese' },
-    'de': { code: 'de', emoji: '🇩🇪', nomAnglais: 'German' },
-    'it': { code: 'it', emoji: '🇮🇹', nomAnglais: 'Italian' },
-    'pt': { code: 'pt', emoji: '🇵🇹', nomAnglais: 'Portuguese' },
-    'zh': { code: 'zh', emoji: '🇨🇳', nomAnglais: 'Chinese' },
-    'ko': { code: 'ko', emoji: '🇰🇷', nomAnglais: 'Korean' },
-    'ar': { code: 'ar', emoji: '🇸🇦', nomAnglais: 'Arabic' },
-    'ru': { code: 'ru', emoji: '🇷🇺', nomAnglais: 'Russian' },
+    'fr': 'Français',
+    'en': 'Anglais',
+    'es': 'Espagnol',
+    'de': 'Allemand',
+    'it': 'Italien',
+    'pt': 'Portugais',
+    'ru': 'Russe',
+    'ja': 'Japonais',
+    'ko': 'Coréen',
+    'zh': 'Chinois',
+    'ar': 'Arabe',
+    'hi': 'Hindi',
+    'nl': 'Néerlandais',
+    'tr': 'Turc',
+    'vi': 'Vietnamien',
+    'th': 'Thaïlandais',
+    'ht': 'Créole Haïtien',
+    'id': 'Indonésien'
 };
 
-const FRANC_VERS_ISO1 = {
-    fra: 'fr', eng: 'en', spa: 'es', jpn: 'ja', deu: 'de', ita: 'it',
-    por: 'pt', cmn: 'zh', zho: 'zh', kor: 'ko', arb: 'ar', ara: 'ar',
-    rus: 'ru', hat: 'ht', nld: 'nl', tur: 'tr', hin: 'hi', ind: 'id',
-    vie: 'vi', tha: 'th'
-};
-
-const EMAIL_MYMEMORY = 'malandaniel250@gmail.com';
-
 // =============================================
-// 2. DÉTECTION DE LA LANGUE
+// 2. TRADUCTION
 // =============================================
-function detecterLangue(texte) {
-    if (!franc) return 'inconnue';
+
+async function translateText(text, targetLang) {
+    let translatedText = null;
+
+    // ✅ API 1 : Google Translate (sans clé)
     try {
-        const code3 = franc(texte, { minLength: 2 });
-        if (code3 === 'und') return 'inconnue';
-        return FRANC_VERS_ISO1[code3] || 'inconnue';
-    } catch (error) {
-        return 'inconnue';
-    }
-}
-
-// =============================================
-// 3. FOURNISSEURS DE TRADUCTION (avec en-têtes)
-// =============================================
-
-async function viaGoogleTranslate(texte, source, cible) {
-    const src = source === 'inconnue' ? 'auto' : source;
-    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${src}&tl=${cible}&dt=t&q=${encodeURIComponent(texte)}`;
-    const response = await axios.get(url, {
-        timeout: 10000,
-        headers: HEADERS
-    });
-    const data = response.data;
-    if (!data || !data[0]) throw new Error('Google: réponse vide');
-    let translated = '';
-    for (const part of data[0]) {
-        if (part[0]) translated += part[0];
-    }
-    if (!translated.trim()) throw new Error('Google: traduction vide');
-    return translated;
-}
-
-async function viaMyMemory(texte, source, cible) {
-    const response = await axios.get('https://api.mymemory.translated.net/get', {
-        timeout: 8000,
-        params: { q: texte, langpair: `${source}|${cible}`, de: EMAIL_MYMEMORY },
-        headers: HEADERS
-    });
-    const data = response.data;
-    if (data.responseStatus && Number(data.responseStatus) >= 400) {
-        throw new Error(`MyMemory: ${data.responseData?.translatedText || data.responseStatus}`);
-    }
-    const texteTraduit = data?.responseData?.translatedText;
-    if (!texteTraduit || texteTraduit.trim() === '') throw new Error('MyMemory: réponse vide');
-    return texteTraduit;
-}
-
-async function viaDreadedSite(texte, source, cible) {
-    const response = await axios.get('https://api.dreaded.site/api/translate', {
-        timeout: 10000,
-        params: { text: texte, lang: cible },
-        headers: HEADERS
-    });
-    const texteTraduit = response.data?.translated;
-    if (!texteTraduit || texteTraduit.trim() === '') throw new Error('dreaded.site: réponse vide');
-    return texteTraduit;
-}
-
-async function viaLingva(texte, source, cible) {
-    const src = source === 'inconnue' ? 'auto' : source;
-    const url = `https://lingva.ml/api/v1/${src}/${cible}/${encodeURIComponent(texte)}`;
-    const response = await axios.get(url, {
-        timeout: 8000,
-        headers: HEADERS
-    });
-    const texteTraduit = response.data?.translation;
-    if (!texteTraduit || texteTraduit.trim() === '') throw new Error('Lingva: réponse vide');
-    return texteTraduit;
-}
-
-async function viaLibreTranslate(texte, source, cible) {
-    const response = await axios.post('https://libretranslate.com/translate', {
-        q: texte,
-        source: source === 'inconnue' ? 'auto' : source,
-        target: cible,
-        format: 'text'
-    }, {
-        timeout: 10000,
-        headers: {
-            ...HEADERS,
-            'Content-Type': 'application/json'
+        const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${targetLang}&dt=t&q=${encodeURIComponent(text)}`;
+        const response = await fetch(url);
+        if (response.ok) {
+            const data = await response.json();
+            if (data && data[0] && data[0][0] && data[0][0][0]) {
+                translatedText = data[0][0][0];
+                console.log('✅ Google Translate réussi');
+                return translatedText;
+            }
         }
-    });
-    const texteTraduit = response.data?.translatedText;
-    if (!texteTraduit || texteTraduit.trim() === '') throw new Error('LibreTranslate: réponse vide');
-    return texteTraduit;
-}
-
-async function viaGemini(texte, source, cible, nomLangueCibleAnglais) {
-    // Si tu as une clé Gemini, tu peux l'activer
-    // Sinon, cette fonction est ignorée
-    throw new Error('Gemini: clé API non configurée');
-}
-
-/**
- * Essaie chaque fournisseur dans l'ordre
- */
-async function traduireTexte(texte, langueCible, langueSourceDetectee, nomLangueCibleAnglais) {
-    const source = (langueSourceDetectee && langueSourceDetectee !== 'inconnue' && langueSourceDetectee !== langueCible)
-        ? langueSourceDetectee
-        : (langueCible === 'en' ? 'fr' : 'en');
-
-    const fournisseurs = [
-        { nom: 'Google', fn: () => viaGoogleTranslate(texte, source, langueCible) },
-        { nom: 'LibreTranslate', fn: () => viaLibreTranslate(texte, source, langueCible) },
-        { nom: 'MyMemory', fn: () => viaMyMemory(texte, source, langueCible) },
-        { nom: 'DreadedSite', fn: () => viaDreadedSite(texte, source, langueCible) },
-        { nom: 'Lingva', fn: () => viaLingva(texte, source, langueCible) },
-    ];
-
-    const erreurs = [];
-    for (const { nom, fn } of fournisseurs) {
-        try {
-            console.log(`🔄 Tentative avec ${nom}...`);
-            const result = await fn();
-            console.log(`✅ Succès avec ${nom}`);
-            return result;
-        } catch (error) {
-            const status = error.response?.status;
-            erreurs.push(`${nom}${status ? ` (HTTP ${status})` : ''}: ${error.message}`);
-            console.error(`❌ Échec ${nom}:`, error.message);
-        }
+    } catch (e) {
+        console.log('❌ Google Translate échoué:', e.message);
     }
 
-    throw new Error(`Tous les services de traduction ont échoué.\n${erreurs.join('\n')}`);
+    // ✅ API 2 : MyMemory
+    try {
+        const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=auto|${targetLang}`;
+        const response = await fetch(url);
+        if (response.ok) {
+            const data = await response.json();
+            if (data && data.responseData && data.responseData.translatedText) {
+                translatedText = data.responseData.translatedText;
+                console.log('✅ MyMemory réussi');
+                return translatedText;
+            }
+        }
+    } catch (e) {
+        console.log('❌ MyMemory échoué:', e.message);
+    }
+
+    // ✅ API 3 : DreadedSite
+    try {
+        const url = `https://api.dreaded.site/api/translate?text=${encodeURIComponent(text)}&lang=${targetLang}`;
+        const response = await fetch(url);
+        if (response.ok) {
+            const data = await response.json();
+            if (data && data.translated) {
+                translatedText = data.translated;
+                console.log('✅ DreadedSite réussi');
+                return translatedText;
+            }
+        }
+    } catch (e) {
+        console.log('❌ DreadedSite échoué:', e.message);
+    }
+
+    // ✅ API 4 : LibreTranslate
+    try {
+        const response = await fetch('https://libretranslate.com/translate', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                q: text,
+                source: 'auto',
+                target: targetLang,
+                format: 'text'
+            })
+        });
+        if (response.ok) {
+            const data = await response.json();
+            if (data && data.translatedText) {
+                translatedText = data.translatedText;
+                console.log('✅ LibreTranslate réussi');
+                return translatedText;
+            }
+        }
+    } catch (e) {
+        console.log('❌ LibreTranslate échoué:', e.message);
+    }
+
+    throw new Error('Tous les services de traduction ont échoué');
 }
 
 // =============================================
-// 4. LISTE DES LANGUES
+// 3. COMMANDE PRINCIPALE .traduit
 // =============================================
-function getListeLangues() {
-    const noms = Object.keys(LANGUES)
-        .filter(key => key.length > 3)
-        .sort();
 
-    return noms.map(nom => {
-        const info = LANGUES[nom];
-        return `${info.emoji} ${nom.charAt(0).toUpperCase() + nom.slice(1)}`;
-    }).join('\n');
-}
-
-// =============================================
-// 5. COMMANDE PRINCIPALE
-// =============================================
-async function handleTraduction(socket, msg, sender, args, prefix, fakevCard, isOwner) {
+async function handleTraduction(socket, msg, sender, args, fakevCard) {
     try {
         // ✅ Réaction
         await socket.sendMessage(sender, { react: { text: '🌐', key: msg.key } }).catch(() => {});
 
-        if (args.length === 0) {
-            const liste = getListeLangues();
-            const message = `🌐 *TRADUCTION*\n\n` +
-                `📌 *Utilisation :*\n` +
-                `1️⃣ ${prefix}traduit [langue] [texte]\n` +
-                `2️⃣ ${prefix}traduit [langue] (en répondant à un message)\n\n` +
-                `📝 *Langues disponibles :*\n${liste}\n\n` +
-                `✅ *Exemples :*\n` +
-                `${prefix}traduit créole Bonjour tout le monde\n` +
-                `${prefix}traduit en japonais Comment ça va ?\n` +
-                `${prefix}traduit ht (répondre à un message)`;
+        let textToTranslate = '';
+        let lang = '';
+        let isReply = false;
 
-            await socket.sendMessage(sender, { text: message }, { quoted: fakevCard });
-            return true;
-        }
-
-        let langueKey = args[0];
-        let texte = '';
-        let indexDebut = 1;
-
-        if (args[0].toLowerCase() === 'en' && args.length > 1) {
-            langueKey = args[1];
-            indexDebut = 2;
-        }
-
-        texte = args.slice(indexDebut).join(' ');
-
+        // Vérifier si c'est une réponse à un message
         const quotedMsg = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
-        if (quotedMsg && (!texte || texte.trim() === '')) {
-            if (quotedMsg.conversation) {
-                texte = quotedMsg.conversation;
-            } else if (quotedMsg.extendedTextMessage?.text) {
-                texte = quotedMsg.extendedTextMessage.text;
-            } else if (quotedMsg.imageMessage?.caption) {
-                texte = quotedMsg.imageMessage.caption;
-            } else if (quotedMsg.videoMessage?.caption) {
-                texte = quotedMsg.videoMessage.caption;
-            } else {
+        if (quotedMsg) {
+            // Récupérer le texte du message cité
+            textToTranslate = quotedMsg.conversation ||
+                              quotedMsg.extendedTextMessage?.text ||
+                              quotedMsg.imageMessage?.caption ||
+                              quotedMsg.videoMessage?.caption ||
+                              '';
+
+            lang = args[0] || '';
+            isReply = true;
+        } else {
+            // Mode direct : .traduit [langue] [texte]
+            if (args.length < 2) {
+                const liste = Object.entries(LANGUES)
+                    .map(([code, nom]) => `• ${code} - ${nom}`)
+                    .join('\n');
+
                 await socket.sendMessage(sender, {
-                    text: '❌ *Impossible de traduire ce type de message.*'
-                }, { quoted: fakevCard });
+                    text: `🌐 *TRADUCTION*\n\n` +
+                          `📌 *Utilisation :*\n` +
+                          `1️⃣ ${args[0] || '.'}traduit [langue] (en répondant à un message)\n` +
+                          `2️⃣ ${args[0] || '.'}traduit [texte] [langue]\n\n` +
+                          `📝 *Langues disponibles :*\n${liste}\n\n` +
+                          `✅ *Exemples :*\n` +
+                          `${args[0] || '.'}traduit fr Bonjour le monde\n` +
+                          `${args[0] || '.'}traduit ja (répondre à un message)`
+                }, { quoted: fakevCard || msg });
                 return true;
             }
+
+            lang = args[args.length - 1]; // Dernier argument = langue
+            textToTranslate = args.slice(0, -1).join(' '); // Le reste = texte
         }
 
-        const langueInfo = LANGUES[langueKey.toLowerCase()];
-        if (!langueInfo) {
-            const liste = getListeLangues();
+        // Vérifier les paramètres
+        if (!textToTranslate || textToTranslate.trim() === '') {
             await socket.sendMessage(sender, {
-                text: `❌ *Langue non reconnue :* "${langueKey}"\n\n📝 *Langues disponibles :*\n${liste}`
-            }, { quoted: fakevCard });
+                text: '❌ *Aucun texte à traduire.*\n\n📌 Répondez à un message ou écrivez le texte à traduire.'
+            }, { quoted: fakevCard || msg });
             return true;
         }
 
-        if (!texte || texte.trim() === '') {
+        // Vérifier la langue
+        if (!lang || !LANGUES[lang]) {
+            const liste = Object.entries(LANGUES)
+                .map(([code, nom]) => `• ${code} - ${nom}`)
+                .join('\n');
+
             await socket.sendMessage(sender, {
-                text: `❌ *Texte vide !*\n\n📌 *Usage :* ${prefix}traduit ${langueKey} [texte à traduire]`
-            }, { quoted: fakevCard });
+                text: `❌ *Langue non reconnue :* "${lang}"\n\n📝 *Langues disponibles :*\n${liste}`
+            }, { quoted: fakevCard || msg });
             return true;
         }
 
-        const langueSource = detecterLangue(texte);
-        const texteTraduit = await traduireTexte(texte, langueInfo.code, langueSource, langueInfo.nomAnglais);
+        // Message d'attente
+        await socket.sendMessage(sender, {
+            text: `🌐 *Traduction en cours...*\n\n📌 ${textToTranslate.substring(0, 50)}${textToTranslate.length > 50 ? '...' : ''}\n\n🔍 Langue cible : ${LANGUES[lang]}`
+        }, { quoted: fakevCard || msg });
 
-        let sourceNom = langueSource;
-        for (const [nom, info] of Object.entries(LANGUES)) {
-            if (info.code === langueSource) {
-                sourceNom = nom;
-                break;
-            }
-        }
+        // Traduire
+        const translatedText = await translateText(textToTranslate, lang);
 
-        const message = `🌐 *TRADUCTION*\n\n` +
-            `📝 *Texte original :*\n${texte}\n\n` +
-            `✅ *Traduction (${langueInfo.emoji} ${langueKey}) :*\n${texteTraduit}\n\n` +
-            `🔍 *Langue source :* ${sourceNom}`;
+        // Envoyer le résultat
+        await socket.sendMessage(sender, {
+            text: `🌐 *TRADUCTION*\n\n` +
+                  `📝 *Texte original :*\n${textToTranslate}\n\n` +
+                  `✅ *Traduction (${LANGUES[lang]}) :*\n${translatedText}`
+        }, { quoted: fakevCard || msg });
 
-        await socket.sendMessage(sender, { text: message }, { quoted: fakevCard });
         return true;
 
     } catch (error) {
-        console.error('Erreur handleTraduction:', error.message);
+        console.error('❌ Erreur handleTranslate:', error.message);
         await socket.sendMessage(sender, {
-            text: `❌ *Erreur de traduction :*\n${error.message}`
-        }, { quoted: fakevCard });
+            text: `❌ *Erreur de traduction :*\n${error.message}\n\n💡 Réessayez plus tard ou vérifiez la langue.`
+        }, { quoted: fakevCard || msg }).catch(() => {});
         return true;
     }
 }
 
-// =============================================
-// 6. EXPORTS
-// =============================================
-module.exports = {
-    handleTraduction,
-    LANGUES,
-    getListeLangues,
-    traduireTexte,
-    detecterLangue
-};
+module.exports = { handleTraduction };
