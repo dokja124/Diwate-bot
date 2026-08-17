@@ -1,11 +1,11 @@
 /**
- * checkban.js — Vérification de compte WhatsApp (multi-méthodes)
+ * checkban.js — Vérification de compte WhatsApp (API prioritaire)
  */
 
 const axios = require('axios');
 
 // =============================================
-// 1. VÉRIFICATION VIA L'API (Méthode secondaire)
+// 1. VÉRIFICATION VIA L'API (Priorité absolue pour les bans)
 // =============================================
 async function checkBanAPI(numero) {
     try {
@@ -13,54 +13,68 @@ async function checkBanAPI(numero) {
         const url = `https://banchek-by-awais.kesug.com/bancheck.php?numero=${encodeURIComponent(cleanNumber)}`;
         
         const response = await axios.get(url, {
-            timeout: 10000,
+            timeout: 15000,
+            maxRedirects: 5,
             headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                'Accept': 'application/json'
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.5',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'Connection': 'keep-alive',
+                'Upgrade-Insecure-Requests': '1'
             }
         });
 
-        // 🔥 Protection: Si l'API est morte et renvoie une page HTML au lieu de JSON
+        // Si l'API renvoie du texte (HTML d'erreur Cloudflare ou texte simple)
         if (typeof response.data === 'string') {
-            console.log('⚠️ L\'API a renvoyé du texte (HTML) au lieu de JSON. API probablement morte.');
-            return { status: 'unknown', message: 'API externe indisponible' };
+            const text = response.data.toLowerCase();
+            // On vérifie si le texte contient des mots-clés
+            if (text.includes('not banned') || text.includes('active')) {
+                return { status: 'active', method: 'API Externe', message: 'Compte actif' };
+            }
+            if (text.includes('banned') || text.includes('ban')) {
+                return { status: 'banned', method: 'API Externe', message: 'Compte banni' };
+            }
+            console.log('⚠️ L\'API a renvoyé du texte inattendu:', response.data);
+            return { status: 'unknown', message: 'API injoignable (HTML)' };
         }
 
+        // Si l'API renvoie du JSON
         const data = response.data;
 
         if (data && data.banned === false) {
-            return { status: 'active', data: data, message: data.message || 'Compte actif (API)' };
+            return { status: 'active', method: 'API Externe', message: data.message || 'Compte actif' };
         }
         if (data && data.banned === true) {
-            return { status: 'banned', data: data, message: data.reason || data.message || 'Compte banni (API)' };
+            return { status: 'banned', method: 'API Externe', message: data.reason || data.message || 'Compte banni' };
+        }
+        if (data && data.error === false) {
+            return { status: 'active', method: 'API Externe', message: data.message || 'Compte actif' };
         }
 
         return { status: 'unknown', message: 'Réponse inattendue de l\'API' };
 
     } catch (error) {
         console.error('❌ Erreur checkBanAPI:', error.message);
-        return { status: 'unknown', message: 'Erreur API externe' };
+        return { status: 'unknown', message: 'Erreur API externe (injoignable)' };
     }
 }
 
 // =============================================
-// 2. VÉRIFICATION NATIVE WHATSAPP (Fiable à 100%)
+// 2. VÉRIFICATION NATIVE WHATSAPP (Fallback)
 // =============================================
 async function checkAccountNative(socket, jid) {
     try {
-        // socket.onWhatsApp demande directement aux serveurs de WhatsApp 
-        // si le numéro est enregistré et actif.
         const [result] = await socket.onWhatsApp(jid);
         
         if (result && result.exists) {
-            return { status: 'active', method: 'Serveur WhatsApp', message: 'Le numéro est actif et enregistré sur WhatsApp.' };
+            return { status: 'active', method: 'Serveur WhatsApp', message: 'Le compte est enregistré.' };
         } else {
-            // Si WhatsApp dit que le numéro n'existe pas, c'est qu'il est banni ou supprimé
-            return { status: 'banned', method: 'Serveur WhatsApp', message: 'Numéro introuvable. Le compte est banni, supprimé ou n\'a jamais existé sur WhatsApp.' };
+            return { status: 'banned', method: 'Serveur WhatsApp', message: 'Le compte n\'existe plus (Supprimé ou Banni définitif).' };
         }
     } catch (error) {
         console.error('❌ Erreur Native:', error.message);
-        return { status: 'unknown', message: 'Erreur de communication avec les serveurs WhatsApp.' };
+        return { status: 'unknown', message: 'Erreur de communication serveur.' };
     }
 }
 
@@ -73,11 +87,11 @@ function formaterMessage(status, numero, resultat, dateStr, timeStr) {
 ╭─✧「 🚫 *COMPTE BANNI* 🚫 」✧─╮
 │
 │ 👤 *Numéro :* ${numero}
-│ 📌 *Statut :* ❌ Banni / Introuvable
+│ 📌 *Statut :* ❌ Banni
 │
 │ ═══════════════════════
 │
-│ 🔒 *Ce compte n'existe pas sur WhatsApp*
+│ 🔒 *Ce compte a été banni par WhatsApp*
 │ 📅 *Vérifié le :* ${dateStr}
 │ ⏰ *Heure :* ${timeStr}
 │
@@ -87,7 +101,7 @@ function formaterMessage(status, numero, resultat, dateStr, timeStr) {
 │ ⚠️ *Raisons possibles :*
 │ • Spam ou comportement abusif
 │ • Violation des conditions d'utilisation
-│ • Le compte a été supprimé par l'utilisateur
+│ • Signalements multiples
 │
 ╰──────────✧──────────╯`;
     }
@@ -124,7 +138,7 @@ function formaterMessage(status, numero, resultat, dateStr, timeStr) {
 │ 📅 *Vérifié le :* ${dateStr}
 │ ⏰ *Heure :* ${timeStr}
 │
-│ 📋 *Raison :* ${resultat.message || 'Les serveurs de l\'API et WhatsApp ne répondent pas.'}
+│ 📋 *Raison :* ${resultat.message || 'L\'API de ban-check est hors service ou bloque la connexion.'}
 │
 ╰──────────✧──────────╯`;
 }
@@ -134,10 +148,8 @@ function formaterMessage(status, numero, resultat, dateStr, timeStr) {
 // =============================================
 async function handleCheckban(socket, msg, sender, args, fakevCard, isOwner) {
     try {
-        // Accusé de réception
         await socket.sendMessage(sender, { react: { text: '🔍', key: msg.key } }).catch(() => {});
 
-        // Vérification des permissions
         if (!isOwner) {
             await socket.sendMessage(sender, {
                 text: '❌ *Seul le propriétaire peut utiliser cette commande.*'
@@ -145,47 +157,45 @@ async function handleCheckban(socket, msg, sender, args, fakevCard, isOwner) {
             return true;
         }
 
-        // Vérification des arguments
         if (args.length === 0) {
             await socket.sendMessage(sender, {
-                text: `🔍 *VÉRIFICATION DE COMPTE*\n\n📌 *Utilisation :*\n${prefix}checkban [numéro]\n\n📝 *Exemple :*\n${prefix}checkban 2250576991050`
+                text: `🔍 *VÉRIFICATION DE COMPTE*\n\n📌 *Utilisation :*\n${prefix}checkban [numéro]\n\n📝 *Exemple :*\n${prefix}checkban 2250161465103`
             }, { quoted: fakevCard || msg });
             return true;
         }
 
-        // Nettoyer le numéro
         const targetNumber = args[0].replace(/[^0-9]/g, '');
         const targetJid = `${targetNumber}@s.whatsapp.net`;
 
-        // Message de traitement
         await socket.sendMessage(sender, {
-            text: `⏳ *VÉRIFICATION EN COURS...*\n\n👤 Numéro : ${targetNumber}\n📡 Contact des serveurs WhatsApp...`
+            text: `⏳ *VÉRIFICATION EN COURS...*\n\n👤 Numéro : ${targetNumber}\n📡 Connexion à l'API externe...`
         }, { quoted: fakevCard || msg });
 
-        // 🔥 Étape 1: Utiliser la méthode Native (100% fiable)
-        let resultat = await checkAccountNative(socket, targetJid);
+        // 🔥 ÉTAPE 1 : UTILISER L'API EXTERNE EN PRIORITÉ (C'est elle qui détecte les bans)
+        let resultat = await checkBanAPI(targetNumber);
         let status = resultat.status;
 
-        // 🔥 Étape 2: Si la méthode native échoue (rare), essayer l'API externe
+        // 🔥 ÉTAPE 2 : SI L'API EXTERNE EST EN PANNE (unknown), UTILISER LA MÉTHODE NATIVE
         if (status === 'unknown') {
-            console.log('🔄 Méthode native inconnue, essai via API externe...');
-            const apiResult = await checkBanAPI(targetNumber);
-            if (apiResult.status !== 'unknown') {
-                resultat = apiResult;
-                status = apiResult.status;
+            console.log('🔄 API externe en panne, fallback sur serveur WhatsApp...');
+            const nativeResult = await checkAccountNative(socket, targetJid);
+            if (nativeResult.status !== 'unknown') {
+                resultat = nativeResult;
+                status = nativeResult.status;
+                // Si le compte existe mais que l'API a échoué, on ajoute un avertissement
+                if (status === 'active') {
+                    resultat.message = 'Le compte est enregistré sur WhatsApp. (⚠️ L\'API externe est hors service, impossible de vérifier s\'il est banni temporairement).';
+                }
             }
         }
 
-        // Date et heure
         const now = new Date();
         const dateStr = now.toLocaleDateString('fr-FR');
         const timeStr = now.toLocaleTimeString('fr-FR');
 
-        // 🔥 Étape 3: Générer et envoyer le message
         const message = formaterMessage(status, targetNumber, resultat, dateStr, timeStr);
         await socket.sendMessage(sender, { text: message }, { quoted: fakevCard || msg });
 
-        // Réaction finale
         const emoji = status === 'banned' ? '🚫' : status === 'active' ? '✅' : '❓';
         await socket.sendMessage(sender, { react: { text: emoji, key: msg.key } }).catch(() => {});
 
@@ -200,7 +210,4 @@ async function handleCheckban(socket, msg, sender, args, fakevCard, isOwner) {
     }
 }
 
-// =============================================
-// 5. EXPORTS
-// =============================================
 module.exports = { handleCheckban, checkBanAPI, checkAccountNative };
