@@ -23,7 +23,7 @@ async function checkBanAPI(numero) {
 
         let data = response.data;
 
-        // ✅ Si c'est un objet JSON standard (banned: false)
+        // ✅ Si c'est un objet JSON standard
         if (typeof data === 'object' && data !== null) {
             if (data.banned === false) {
                 return { status: 'active', method: 'API Externe', message: data.message || 'Compte actif' };
@@ -35,7 +35,6 @@ async function checkBanAPI(numero) {
 
         // ✅ Si c'est du TEXTE (comme montré dans ta capture d'écran)
         if (typeof data === 'string') {
-            // On cherche "banned: true" ou "banned: false" avec ou sans guillemets
             const isBanned = /"?banned"?\s*:\s*true/i.test(data);
             const isActive = /"?banned"?\s*:\s*false/i.test(data);
 
@@ -50,18 +49,19 @@ async function checkBanAPI(numero) {
                 return { status: 'banned', method: 'API Externe', message: apiMessage };
             }
 
-            // Vérifier si c'est une page HTML d'erreur (Cloudflare, etc.)
+            // Vérifier si c'est une page HTML d'erreur
             if (data.includes('<html') || data.includes('<!DOCTYPE') || data.length > 500) {
-                console.log('⚠️ L\'API a renvoyé une page HTML d\'erreur.');
+                console.log("⚠️ L'API a renvoyé une page HTML d'erreur.");
                 return { status: 'unknown', message: 'API externe bloquée (HTML)' };
             }
         }
 
-        console.log('⚠️ Réponse de l'API non reconnue:', data);
+        // LIGNE 60 CORRIGÉE ICI (guillemets doubles au lieu de simples)
+        console.log("⚠️ Réponse de l'API non reconnue:", data);
         return { status: 'unknown', message: 'Réponse non reconnue' };
 
     } catch (error) {
-        console.error('❌ Erreur checkBanAPI:', error.message);
+        console.error("❌ Erreur checkBanAPI:", error.message);
         return { status: 'unknown', message: 'Erreur API externe' };
     }
 }
@@ -77,13 +77,13 @@ async function checkAccountNative(socket, jid) {
             return { 
                 status: 'active', 
                 method: 'Serveur WhatsApp', 
-                message: 'Le compte est enregistré sur WhatsApp. (⚠️ L\'API de ban-check est en panne, impossible de vérifier s\'il s\'agit d\'un ban temporaire).' 
+                message: "Le compte est enregistré sur WhatsApp. (⚠️ L'API de ban-check est en panne, impossible de vérifier s'il s'agit d'un ban temporaire)." 
             };
         } else {
             return { 
                 status: 'banned', 
                 method: 'Serveur WhatsApp', 
-                message: 'Le compte n\'existe plus (Supprimé ou Banni définitivement).' 
+                message: "Le compte n'existe plus (Supprimé ou Banni définitivement)." 
             };
         }
     } catch (error) {
@@ -146,7 +146,7 @@ function formaterMessage(status, numero, resultat, dateStr, timeStr) {
 │ 📅 *Vérifié le :* ${dateStr}
 │ ⏰ *Heure :* ${timeStr}
 │
-│ 📋 *Raison :* ${resultat.message || 'Les serveurs de l\'API et WhatsApp ne répondent pas.'}
+│ 📋 *Raison :* ${resultat.message || "Les serveurs de l'API et WhatsApp ne répondent pas."}
 │
 ╰──────────✧──────────╯`;
 }
