@@ -72,7 +72,7 @@ const config = {
     GROUP_INVITE_LINK: '',
     ADMIN_LIST_PATH: './admin.json',
     RCD_IMAGE_PATH: 'https://www.image2url.com/r2/default/images/1785884570239-0bcc7adc-2b29-4658-b1aa-023a91ca3b52.jpg',
-    MENU_VIDEO_PATH: 'https://www.image2url.com/r2/default/videos/1786954685537-626d8679-7fea-4f1c-abaa-c1457618f0d2.mp4',
+    MENU_VIDEO_PATH: 'https://cdn.discordapp.com/attachments/1538137041131540503/1538137276524003422/a047723590071c5c6f2877820f439085_1786731559729.mp4?ex=6a838fb7&is=6a823e37&hm=3ffb8d7387057e2a11a63e93de5cf6e9e98e4f7628a71e0ca7d6a84cc484c6e3&',
     NEWSLETTER_JID: '120363402708281380@Newslette',
     NEWSLETTER_MESSAGE_ID: '428',
     OTP_EXPIRY: 300000,
