@@ -1,11 +1,11 @@
 /**
- * checkban.js — Vérification de compte WhatsApp (API prioritaire)
+ * checkban.js — Vérification de compte WhatsApp (Multi-méthodes)
  */
 
 const axios = require('axios');
 
 // =============================================
-// 1. VÉRIFICATION VIA L'API (Priorité absolue pour les bans)
+// 1. VÉRIFICATION VIA L'API EXTERNE
 // =============================================
 async function checkBanAPI(numero) {
     try {
@@ -17,46 +17,52 @@ async function checkBanAPI(numero) {
             maxRedirects: 5,
             headers: {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-                'Accept-Language': 'en-US,en;q=0.5',
-                'Accept-Encoding': 'gzip, deflate, br',
-                'Connection': 'keep-alive',
-                'Upgrade-Insecure-Requests': '1'
+                'Accept': 'text/plain, */*'
             }
         });
 
-        // Si l'API renvoie du texte (HTML d'erreur Cloudflare ou texte simple)
-        if (typeof response.data === 'string') {
-            const text = response.data.toLowerCase();
-            // On vérifie si le texte contient des mots-clés
-            if (text.includes('not banned') || text.includes('active')) {
-                return { status: 'active', method: 'API Externe', message: 'Compte actif' };
+        let data = response.data;
+
+        // ✅ Si c'est un objet JSON standard (banned: false)
+        if (typeof data === 'object' && data !== null) {
+            if (data.banned === false) {
+                return { status: 'active', method: 'API Externe', message: data.message || 'Compte actif' };
             }
-            if (text.includes('banned') || text.includes('ban')) {
-                return { status: 'banned', method: 'API Externe', message: 'Compte banni' };
+            if (data.banned === true) {
+                return { status: 'banned', method: 'API Externe', message: data.message || 'Compte banni' };
             }
-            console.log('⚠️ L\'API a renvoyé du texte inattendu:', response.data);
-            return { status: 'unknown', message: 'API injoignable (HTML)' };
         }
 
-        // Si l'API renvoie du JSON
-        const data = response.data;
+        // ✅ Si c'est du TEXTE (comme montré dans ta capture d'écran)
+        if (typeof data === 'string') {
+            // On cherche "banned: true" ou "banned: false" avec ou sans guillemets
+            const isBanned = /"?banned"?\s*:\s*true/i.test(data);
+            const isActive = /"?banned"?\s*:\s*false/i.test(data);
 
-        if (data && data.banned === false) {
-            return { status: 'active', method: 'API Externe', message: data.message || 'Compte actif' };
-        }
-        if (data && data.banned === true) {
-            return { status: 'banned', method: 'API Externe', message: data.reason || data.message || 'Compte banni' };
-        }
-        if (data && data.error === false) {
-            return { status: 'active', method: 'API Externe', message: data.message || 'Compte actif' };
+            // Extraire le message (ex: message: 'This number...')
+            const msgMatch = data.match(/message\s*:\s*['"]([^'"]+)['"]/i);
+            const apiMessage = msgMatch ? msgMatch[1] : 'Réceptionnée';
+
+            if (isActive) {
+                return { status: 'active', method: 'API Externe', message: apiMessage };
+            }
+            if (isBanned) {
+                return { status: 'banned', method: 'API Externe', message: apiMessage };
+            }
+
+            // Vérifier si c'est une page HTML d'erreur (Cloudflare, etc.)
+            if (data.includes('<html') || data.includes('<!DOCTYPE') || data.length > 500) {
+                console.log('⚠️ L\'API a renvoyé une page HTML d\'erreur.');
+                return { status: 'unknown', message: 'API externe bloquée (HTML)' };
+            }
         }
 
-        return { status: 'unknown', message: 'Réponse inattendue de l\'API' };
+        console.log('⚠️ Réponse de l'API non reconnue:', data);
+        return { status: 'unknown', message: 'Réponse non reconnue' };
 
     } catch (error) {
         console.error('❌ Erreur checkBanAPI:', error.message);
-        return { status: 'unknown', message: 'Erreur API externe (injoignable)' };
+        return { status: 'unknown', message: 'Erreur API externe' };
     }
 }
 
@@ -68,13 +74,21 @@ async function checkAccountNative(socket, jid) {
         const [result] = await socket.onWhatsApp(jid);
         
         if (result && result.exists) {
-            return { status: 'active', method: 'Serveur WhatsApp', message: 'Le compte est enregistré.' };
+            return { 
+                status: 'active', 
+                method: 'Serveur WhatsApp', 
+                message: 'Le compte est enregistré sur WhatsApp. (⚠️ L\'API de ban-check est en panne, impossible de vérifier s\'il s\'agit d\'un ban temporaire).' 
+            };
         } else {
-            return { status: 'banned', method: 'Serveur WhatsApp', message: 'Le compte n\'existe plus (Supprimé ou Banni définitif).' };
+            return { 
+                status: 'banned', 
+                method: 'Serveur WhatsApp', 
+                message: 'Le compte n\'existe plus (Supprimé ou Banni définitivement).' 
+            };
         }
     } catch (error) {
         console.error('❌ Erreur Native:', error.message);
-        return { status: 'unknown', message: 'Erreur de communication serveur.' };
+        return { status: 'unknown', message: 'Erreur serveur WhatsApp.' };
     }
 }
 
@@ -98,11 +112,6 @@ function formaterMessage(status, numero, resultat, dateStr, timeStr) {
 │ 📋 *Détail :* ${resultat.message || 'Non spécifiée'}
 │ 📡 *Vérifié via :* ${resultat.method || 'API'}
 │
-│ ⚠️ *Raisons possibles :*
-│ • Spam ou comportement abusif
-│ • Violation des conditions d'utilisation
-│ • Signalements multiples
-│
 ╰──────────✧──────────╯`;
     }
 
@@ -119,9 +128,8 @@ function formaterMessage(status, numero, resultat, dateStr, timeStr) {
 │ 📅 *Vérifié le :* ${dateStr}
 │ ⏰ *Heure :* ${timeStr}
 │
+│ 📋 *Détail :* ${resultat.message || 'Tout est en ordre'}
 │ 📡 *Vérifié via :* ${resultat.method || 'API'}
-│
-│ 💚 *Tout est en ordre !*
 │
 ╰──────────✧──────────╯`;
     }
@@ -138,7 +146,7 @@ function formaterMessage(status, numero, resultat, dateStr, timeStr) {
 │ 📅 *Vérifié le :* ${dateStr}
 │ ⏰ *Heure :* ${timeStr}
 │
-│ 📋 *Raison :* ${resultat.message || 'L\'API de ban-check est hors service ou bloque la connexion.'}
+│ 📋 *Raison :* ${resultat.message || 'Les serveurs de l\'API et WhatsApp ne répondent pas.'}
 │
 ╰──────────✧──────────╯`;
 }
@@ -146,7 +154,7 @@ function formaterMessage(status, numero, resultat, dateStr, timeStr) {
 // =============================================
 // 4. COMMANDE PRINCIPALE .checkban
 // =============================================
-async function handleCheckban(socket, msg, sender, args, fakevCard, isOwner) {
+async function handleCheckban(socket, msg, sender, args, prefix, fakevCard, isOwner) {
     try {
         await socket.sendMessage(sender, { react: { text: '🔍', key: msg.key } }).catch(() => {});
 
@@ -171,21 +179,17 @@ async function handleCheckban(socket, msg, sender, args, fakevCard, isOwner) {
             text: `⏳ *VÉRIFICATION EN COURS...*\n\n👤 Numéro : ${targetNumber}\n📡 Connexion à l'API externe...`
         }, { quoted: fakevCard || msg });
 
-        // 🔥 ÉTAPE 1 : UTILISER L'API EXTERNE EN PRIORITÉ (C'est elle qui détecte les bans)
+        // 🔥 ÉTAPE 1 : API EXTERNE EN PRIORITÉ
         let resultat = await checkBanAPI(targetNumber);
         let status = resultat.status;
 
-        // 🔥 ÉTAPE 2 : SI L'API EXTERNE EST EN PANNE (unknown), UTILISER LA MÉTHODE NATIVE
+        // 🔥 ÉTAPE 2 : SI L'API EXTERNE EST EN PANNE (unknown), FALLBACK NATIF
         if (status === 'unknown') {
             console.log('🔄 API externe en panne, fallback sur serveur WhatsApp...');
             const nativeResult = await checkAccountNative(socket, targetJid);
             if (nativeResult.status !== 'unknown') {
                 resultat = nativeResult;
                 status = nativeResult.status;
-                // Si le compte existe mais que l'API a échoué, on ajoute un avertissement
-                if (status === 'active') {
-                    resultat.message = 'Le compte est enregistré sur WhatsApp. (⚠️ L\'API externe est hors service, impossible de vérifier s\'il est banni temporairement).';
-                }
             }
         }
 
