@@ -1,4 +1,4 @@
-const fetch = require('node-fetch');
+const axios = require('axios');
 
 // =============================================
 // 1. LANGUES DISPONIBLES
@@ -30,16 +30,21 @@ const LANGUES = {
 // =============================================
 
 async function translateText(text, targetLang) {
-    let translatedText = null;
-
     // ✅ API 1 : Google Translate (sans clé)
     try {
         const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${targetLang}&dt=t&q=${encodeURIComponent(text)}`;
-        const response = await fetch(url);
-        if (response.ok) {
-            const data = await response.json();
-            if (data && data[0] && data[0][0] && data[0][0][0]) {
-                translatedText = data[0][0][0];
+        const response = await axios.get(url, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            }
+        });
+        if (response.data && response.data[0]) {
+            // Google renvoie un tableau de morceaux, il faut tout concaténer
+            let translatedText = '';
+            for (let chunk of response.data[0]) {
+                if (chunk[0]) translatedText += chunk[0];
+            }
+            if (translatedText) {
                 console.log('✅ Google Translate réussi');
                 return translatedText;
             }
@@ -51,59 +56,25 @@ async function translateText(text, targetLang) {
     // ✅ API 2 : MyMemory
     try {
         const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=auto|${targetLang}`;
-        const response = await fetch(url);
-        if (response.ok) {
-            const data = await response.json();
-            if (data && data.responseData && data.responseData.translatedText) {
-                translatedText = data.responseData.translatedText;
-                console.log('✅ MyMemory réussi');
-                return translatedText;
-            }
+        const response = await axios.get(url);
+        if (response.data && response.data.responseData && response.data.responseData.translatedText) {
+            console.log('✅ MyMemory réussi');
+            return response.data.responseData.translatedText;
         }
     } catch (e) {
         console.log('❌ MyMemory échoué:', e.message);
     }
 
-    // ✅ API 3 : DreadedSite
+    // ✅ API 3 : Lingva (Alternative très fiable à Google)
     try {
-        const url = `https://api.dreaded.site/api/translate?text=${encodeURIComponent(text)}&lang=${targetLang}`;
-        const response = await fetch(url);
-        if (response.ok) {
-            const data = await response.json();
-            if (data && data.translated) {
-                translatedText = data.translated;
-                console.log('✅ DreadedSite réussi');
-                return translatedText;
-            }
+        const url = `https://lingva.ml/api/v1/auto/${targetLang}/${encodeURIComponent(text)}`;
+        const response = await axios.get(url);
+        if (response.data && response.data.translation) {
+            console.log('✅ Lingva réussi');
+            return response.data.translation;
         }
     } catch (e) {
-        console.log('❌ DreadedSite échoué:', e.message);
-    }
-
-    // ✅ API 4 : LibreTranslate
-    try {
-        const response = await fetch('https://libretranslate.com/translate', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                q: text,
-                source: 'auto',
-                target: targetLang,
-                format: 'text'
-            })
-        });
-        if (response.ok) {
-            const data = await response.json();
-            if (data && data.translatedText) {
-                translatedText = data.translatedText;
-                console.log('✅ LibreTranslate réussi');
-                return translatedText;
-            }
-        }
-    } catch (e) {
-        console.log('❌ LibreTranslate échoué:', e.message);
+        console.log('❌ Lingva échoué:', e.message);
     }
 
     throw new Error('Tous les services de traduction ont échoué');
@@ -125,7 +96,6 @@ async function handleTraduction(socket, msg, sender, args, fakevCard) {
         // Vérifier si c'est une réponse à un message
         const quotedMsg = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
         if (quotedMsg) {
-            // Récupérer le texte du message cité
             textToTranslate = quotedMsg.conversation ||
                               quotedMsg.extendedTextMessage?.text ||
                               quotedMsg.imageMessage?.caption ||
@@ -135,7 +105,7 @@ async function handleTraduction(socket, msg, sender, args, fakevCard) {
             lang = args[0] || '';
             isReply = true;
         } else {
-            // Mode direct : .traduit [langue] [texte]
+            // Mode direct : .traduit [langue] [texte] OU .traduit [texte] [langue]
             if (args.length < 2) {
                 const liste = Object.entries(LANGUES)
                     .map(([code, nom]) => `• ${code} - ${nom}`)
@@ -144,18 +114,32 @@ async function handleTraduction(socket, msg, sender, args, fakevCard) {
                 await socket.sendMessage(sender, {
                     text: `🌐 *TRADUCTION*\n\n` +
                           `📌 *Utilisation :*\n` +
-                          `1️⃣ ${args[0] || '.'}traduit [langue] (en répondant à un message)\n` +
-                          `2️⃣ ${args[0] || '.'}traduit [texte] [langue]\n\n` +
+                          `1️⃣ .traduit [langue] (en répondant à un message)\n` +
+                          `2️⃣ .traduit [langue] [texte]\n` +
+                          `3️⃣ .traduit [texte] [langue]\n\n` +
                           `📝 *Langues disponibles :*\n${liste}\n\n` +
                           `✅ *Exemples :*\n` +
-                          `${args[0] || '.'}traduit fr Bonjour le monde\n` +
-                          `${args[0] || '.'}traduit ja (répondre à un message)`
+                          `.traduit fr Bonjour le monde\n` +
+                          `.traduit Bonjour le monde fr\n` +
+                          `.traduit ja (en répondant à un message)`
                 }, { quoted: fakevCard || msg });
                 return true;
             }
 
-            lang = args[args.length - 1]; // Dernier argument = langue
-            textToTranslate = args.slice(0, -1).join(' '); // Le reste = texte
+            // LOGIQUE INTELLIGENTE : On vérifie si le 1er ou le dernier argument est une langue
+            const firstArg = args[0].toLowerCase();
+            const lastArg = args[args.length - 1].toLowerCase();
+
+            if (LANGUES[firstArg]) {
+                lang = firstArg;
+                textToTranslate = args.slice(1).join(' ');
+            } else if (LANGUES[lastArg]) {
+                lang = lastArg;
+                textToTranslate = args.slice(0, -1).join(' ');
+            } else {
+                lang = firstArg; // Pour déclencher l'erreur de langue ci-dessous
+                textToTranslate = args.join(' ');
+            }
         }
 
         // Vérifier les paramètres
@@ -167,7 +151,7 @@ async function handleTraduction(socket, msg, sender, args, fakevCard) {
         }
 
         // Vérifier la langue
-        if (!lang || !LANGUES[lang]) {
+        if (!lang || !LANGUES[lang.toLowerCase()]) {
             const liste = Object.entries(LANGUES)
                 .map(([code, nom]) => `• ${code} - ${nom}`)
                 .join('\n');
@@ -178,9 +162,11 @@ async function handleTraduction(socket, msg, sender, args, fakevCard) {
             return true;
         }
 
+        lang = lang.toLowerCase(); // Sécurité supplémentaire
+
         // Message d'attente
         await socket.sendMessage(sender, {
-            text: `🌐 *Traduction en cours...*\n\n📌 ${textToTranslate.substring(0, 50)}${textToTranslate.length > 50 ? '...' : ''}\n\n🔍 Langue cible : ${LANGUES[lang]}`
+            text: `🌐 *Traduction en cours...*\n\n🔍 Langue cible : ${LANGUES[lang]}`
         }, { quoted: fakevCard || msg });
 
         // Traduire
@@ -193,6 +179,9 @@ async function handleTraduction(socket, msg, sender, args, fakevCard) {
                   `✅ *Traduction (${LANGUES[lang]}) :*\n${translatedText}`
         }, { quoted: fakevCard || msg });
 
+        // ✅ Réaction de succès
+        await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } }).catch(() => {});
+
         return true;
 
     } catch (error) {
@@ -200,6 +189,9 @@ async function handleTraduction(socket, msg, sender, args, fakevCard) {
         await socket.sendMessage(sender, {
             text: `❌ *Erreur de traduction :*\n${error.message}\n\n💡 Réessayez plus tard ou vérifiez la langue.`
         }, { quoted: fakevCard || msg }).catch(() => {});
+        
+        // ❌ Réaction d'erreur
+        await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } }).catch(() => {});
         return true;
     }
 }
