@@ -29,6 +29,7 @@
     "ffmpeg": "latest",
     "google-tts-api": "latest",
     "wa-sticker-formatter": "latest",
+    "@octokit/rest": "latest",
     "denethdev-ytmp3": "latest",
     "cheerio": "latest",
     "ruhend-scraper": "latest",
