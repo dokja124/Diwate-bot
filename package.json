@@ -7,7 +7,7 @@
     "start": "node index.js"
   },
   "dependencies": {
-    "@whiskeysockets/baileys": "github:raldzfvck/baileys",
+    "@whiskeysockets/baileys": "latest",
     "express": "latest",
     "body-parser": "latest",
     "axios": "latest",
@@ -21,7 +21,7 @@
     "@distube/ytdl-core": "^4.13.5",
     "fs-extra": "latest",
     "pino": "latest",
-    "jimp": "0.22.12",
+    "jimp": "^1.6.1",
     "form-data": "latest",
     "canvas": "latest",
     "@ffmpeg-installer/ffmpeg": "latest",
@@ -29,7 +29,6 @@
     "ffmpeg": "latest",
     "google-tts-api": "latest",
     "wa-sticker-formatter": "latest",
-    "@octokit/rest": "latest",
     "denethdev-ytmp3": "latest",
     "cheerio": "latest",
     "ruhend-scraper": "latest",
